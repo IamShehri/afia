@@ -1,0 +1,38 @@
+# AFIA monorepo ignore rules (placeholder).
+# TODO(S03-T01): Refine as toolchains and build outputs are introduced.
+
+# Rust
+/target
+**/target
+
+# Node / frontend
+node_modules
+**/node_modules
+dist
+**/dist
+.vite
+
+# Go
+*.test
+*.out
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.uv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local secrets and runtime artifacts (never commit)
+*.key
+*.pem
+.env
+.env.*
+
+# Generated search indexes, thumbnails, logs (derived; excluded from backups)
+/cache
+/logs

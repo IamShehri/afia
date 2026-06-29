@@ -1,0 +1,10 @@
+# afia-tauri — validated commands, events, DTO/domain mapping.
+# Dependency rule: domain, contracts, application.
+[package]
+name = "afia-tauri"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# TODO: afia-domain, afia-contracts, afia-application. Adapters translate and delegate.

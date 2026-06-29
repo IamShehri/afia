@@ -1,0 +1,27 @@
+# AFIA root Cargo workspace.
+# TODO(S03-T03): Populate workspace members, centralized [workspace.dependencies],
+# and pinned versions. Cargo.lock is generated. No production dependency may create
+# a dependency cycle (see Engineering Program Section 3).
+
+[workspace]
+resolver = "2"
+members = [
+    "apps/desktop/src-tauri",
+    "crates/afia-domain",
+    "crates/afia-contracts",
+    "crates/afia-application",
+    "crates/afia-security",
+    "crates/afia-storage",
+    "crates/afia-workspace",
+    "crates/afia-documents",
+    "crates/afia-search",
+    "crates/afia-ai",
+    "crates/afia-plugins",
+    "crates/afia-tauri",
+]
+
+# TODO(S03-T03): Centralize shared dependencies here and pin exact versions.
+[workspace.dependencies]
+
+# TODO(S03-T03): Define shared package metadata (edition, rust-version, license).
+[workspace.package]

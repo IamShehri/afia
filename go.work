@@ -1,0 +1,6 @@
+// AFIA Go workspace.
+// TODO(S03-T02): Pin the Go version and confirm module list. go.work.sum is generated.
+
+go 1.22
+
+use ./services/operations-go

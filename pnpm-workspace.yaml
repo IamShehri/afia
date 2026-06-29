@@ -1,0 +1,4 @@
+# pnpm workspace definition.
+# TODO(S03-T02): Confirm workspace package globs. pnpm-lock.yaml is generated.
+packages:
+  - "apps/desktop/ui"

@@ -1,0 +1,11 @@
+# afia-storage — SQLCipher connections, migrations, repositories, object storage.
+# Dependency rule: domain, application ports, security.
+[package]
+name = "afia-storage"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# TODO: afia-domain, afia-application (ports), afia-security.
+# TODO(S05-T02): pinned bundled SQLCipher dependency and connection options.

@@ -1,0 +1,8 @@
+{
+  "//": "TODO(S03-T05): Default capability set. MUST deny generic shell, filesystem, and network access. Grant only validated AFIA commands.",
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "AFIA default capability set (deny-by-default).",
+  "windows": ["main"],
+  "permissions": []
+}

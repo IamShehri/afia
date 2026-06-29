@@ -1,0 +1,10 @@
+# afia-application — use cases, ports, authorization decisions, task orchestration.
+# Dependency rule: domain, contracts. Defines ports but never imports a concrete adapter.
+[package]
+name = "afia-application"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# TODO: afia-domain, afia-contracts. No concrete adapter dependency.

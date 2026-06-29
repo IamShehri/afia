@@ -1,0 +1,16 @@
+{
+  "name": "afia",
+  "private": true,
+  "version": "0.0.0",
+  "description": "AFIA monorepo root. Skeleton only — no implementation.",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/desktop/ui"
+  ],
+  "scripts": {
+    "//": "TODO(S03-T02/S03-T06): Wire bootstrap, build, lint, typecheck, and contract-generation scripts."
+  }
+}

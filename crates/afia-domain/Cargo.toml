@@ -1,0 +1,10 @@
+# afia-domain — pure identifiers, entities, value objects, invariants, stable errors.
+# Dependency rule: may depend on small foundational libraries only; NO AFIA crate.
+[package]
+name = "afia-domain"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# TODO: foundational libraries only (no AFIA crate, no storage/UI/runtime).

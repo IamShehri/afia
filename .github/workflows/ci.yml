@@ -1,0 +1,39 @@
+# AFIA baseline CI (placeholder).
+# TODO(S03-T06): Implement format, lint, typecheck, build, and unit-test gates.
+# Rust, Go, Python, TypeScript, and contract checks run in separate visible jobs.
+# The workspace denies warnings, checks licenses/advisories, scans secrets, generates an
+# SBOM, and rejects generated-contract drift.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# TODO(S03-T06): pin action versions and runners (macOS Apple Silicon where required).
+jobs:
+  rust:
+    runs-on: macos-14
+    steps:
+      - run: echo "TODO(S03-T06): cargo fmt --check, clippy -D warnings, build, test, cargo-deny"
+
+  go:
+    runs-on: macos-14
+    steps:
+      - run: echo "TODO(S03-T06): gofmt, go vet, go build ./..., go test ./..."
+
+  python:
+    runs-on: macos-14
+    steps:
+      - run: echo "TODO(S03-T06): ruff, type check, pytest"
+
+  typescript:
+    runs-on: macos-14
+    steps:
+      - run: echo "TODO(S03-T06): pnpm lint, tsc --noEmit, build, unit tests"
+
+  contracts:
+    runs-on: macos-14
+    steps:
+      - run: echo "TODO(S04-T02): generate contracts and fail on drift"

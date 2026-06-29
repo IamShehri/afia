@@ -1,0 +1,21 @@
+{
+  "//": "TODO(S03-T05): Tauri v2 configuration. Capabilities must deny generic shell/filesystem/network access.",
+  "productName": "AFIA",
+  "version": "0.0.0",
+  "identifier": "com.tenomes.afia",
+  "build": {
+    "//": "TODO(S03-T05): Wire frontendDist and beforeBuildCommand to the UI build.",
+    "frontendDist": "../ui/dist",
+    "devUrl": "http://localhost:5173"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "//": "TODO(S03-T05): Lock down CSP and capabilities."
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"]
+  }
+}

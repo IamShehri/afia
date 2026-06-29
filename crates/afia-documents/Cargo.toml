@@ -1,0 +1,10 @@
+# afia-documents — import inspection, parsing, canonical maps, safe content access.
+# Dependency rule: domain, application ports, security, storage.
+[package]
+name = "afia-documents"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# TODO: afia-domain, afia-application (ports), afia-security, afia-storage.

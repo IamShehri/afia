@@ -1,0 +1,15 @@
+# cargo-deny configuration (placeholder).
+# TODO(S03-T06): Configure license allow-list, advisory database, banned crates,
+# and source policy. The workspace must reject license/advisory violations in CI.
+
+[advisories]
+# TODO(S03-T06): Set advisory policy.
+
+[licenses]
+# TODO(S03-T06): Set allowed/denied license identifiers.
+
+[bans]
+# TODO(S03-T06): Set banned crates and multiple-version policy.
+
+[sources]
+# TODO(S03-T06): Restrict crate sources.

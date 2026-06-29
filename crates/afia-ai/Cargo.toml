@@ -1,0 +1,10 @@
+# afia-ai — capability registry, policy routing, Python client, run provenance.
+# Dependency rule: domain, contracts, application ports, security.
+[package]
+name = "afia-ai"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# TODO: afia-domain, afia-contracts, afia-application (ports), afia-security.

@@ -1,0 +1,17 @@
+# afia-desktop — Tauri v2 binary (composition root).
+# TODO(S03-T03/S03-T05): Add Tauri dependencies and wire workspace crates. The shell
+# composes concrete Rust adapters and starts the application; it contains no domain
+# rules and no SQL.
+
+[package]
+name = "afia-desktop"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# TODO(S03-T05): tauri = { version = "2", features = [...] }
+# TODO(S03-T03): afia-application, afia-tauri, and adapter crates (composition only).
+
+[build-dependencies]
+# TODO(S03-T05): tauri-build = { version = "2" }

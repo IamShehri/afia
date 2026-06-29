@@ -1,0 +1,7 @@
+# Pinned Rust toolchain.
+# TODO(S03-T02): Pin the exact channel/version to match feasibility artifacts.
+
+[toolchain]
+# channel = "1.xx.x"  # TODO(S03-T02): set exact version
+components = ["rustfmt", "clippy"]
+targets = ["aarch64-apple-darwin"]

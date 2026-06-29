@@ -1,0 +1,10 @@
+# afia-contracts — generated transport DTOs, schema versions, validation helpers.
+# Dependency rule: generated schema support; NO storage, UI, or runtime crate.
+[package]
+name = "afia-contracts"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# TODO(S04-T02): generated schema support only (no storage/UI/runtime crate).
