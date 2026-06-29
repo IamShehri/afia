@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  AFIA Design Tokens
+  Dark mode is the primary, all-day-comfortable experience: deep warm graphite,
+  never OLED-black. Light mode is a bright, warm-white companion.
+  Accents stay quiet; typography and whitespace lead.
+*/
+
+@layer base {
+  :root {
+    --font-sans: "Inter", "Inter Fallback";
+    --font-mono: "JetBrains Mono", "JetBrains Mono Fallback";
+
+    /* Light mode — warm white, soft surfaces */
+    --canvas: 40 30% 97.5%;
+    --background: 40 33% 99%;
+    --foreground: 24 16% 12%;
+
+    --surface: 0 0% 100%;
+    --surface-raised: 40 25% 99%;
+    --surface-overlay: 0 0% 100%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 24 16% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 24 16% 12%;
+
+    --primary: 214 90% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 35 18% 94%;
+    --secondary-foreground: 24 16% 18%;
+
+    --muted: 36 18% 95%;
+    --muted-foreground: 28 8% 44%;
+
+    --accent: 246 64% 58%;
+    --accent-foreground: 0 0% 100%;
+
+    --cyan: 190 88% 42%;
+    --cyan-foreground: 0 0% 100%;
+
+    --success: 152 56% 38%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 36 92% 46%;
+    --warning-foreground: 36 60% 12%;
+
+    --destructive: 350 74% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 32 14% 89%;
+    --border-strong: 30 12% 82%;
+    --input: 32 14% 88%;
+    --ring: 214 90% 48%;
+
+    --shadow-color: 28 30% 30%;
+
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    /* Dark mode — deep warm graphite, primary experience */
+    --canvas: 24 9% 6.5%;
+    --background: 24 9% 8%;
+    --foreground: 36 14% 93%;
+
+    --surface: 24 8% 10%;
+    --surface-raised: 24 8% 12.5%;
+    --surface-overlay: 24 9% 14.5%;
+
+    --card: 24 8% 10.5%;
+    --card-foreground: 36 14% 93%;
+
+    --popover: 24 9% 13%;
+    --popover-foreground: 36 14% 93%;
+
+    --primary: 213 100% 62%;
+    --primary-foreground: 220 60% 8%;
+
+    --secondary: 24 7% 16%;
+    --secondary-foreground: 36 12% 88%;
+
+    --muted: 24 7% 15%;
+    --muted-foreground: 30 7% 60%;
+
+    --accent: 246 78% 70%;
+    --accent-foreground: 246 50% 10%;
+
+    --cyan: 188 92% 56%;
+    --cyan-foreground: 190 60% 8%;
+
+    --success: 152 58% 50%;
+    --success-foreground: 152 60% 8%;
+
+    --warning: 38 94% 60%;
+    --warning-foreground: 38 70% 8%;
+
+    --destructive: 352 82% 64%;
+    --destructive-foreground: 352 60% 8%;
+
+    --border: 30 6% 20%;
+    --border-strong: 28 6% 28%;
+    --input: 30 6% 22%;
+    --ring: 213 100% 62%;
+
+    --shadow-color: 0 0% 0%;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  html {
+    background-color: hsl(var(--canvas));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: hsl(var(--canvas));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    font-variation-settings: normal;
+  }
+
+  ::selection {
+    background-color: hsl(var(--primary) / 0.24);
+  }
+
+  /* Refined, quiet scrollbars */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border-strong));
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Subtle dotted grid for empty canvas areas */
+  .bg-grid {
+    background-image: radial-gradient(
+      hsl(var(--border)) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+  }
+
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+
+  .skeleton-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--foreground) / 0.04),
+      transparent
+    );
+    animation: shimmer 1.6s infinite;
+  }
+}
