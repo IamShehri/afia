@@ -1,7 +1,18 @@
 // Vite configuration for the AFIA desktop UI.
-// TODO(S03-T04): Configure React plugin, path aliases, and Tauri-compatible build output.
 import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "node:path";
 
 export default defineConfig({
-  // TODO(S03-T04): plugins, resolve.alias, server, and build settings.
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  server: {
+    host: true,
+    port: 3000,
+    strictPort: false,
+  },
 });

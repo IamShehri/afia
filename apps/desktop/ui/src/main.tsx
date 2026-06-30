@@ -1,6 +1,14 @@
 // AFIA desktop UI entry point.
-// TODO(S03-T04): Mount <App /> with providers. No business logic here.
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { App } from "@/app/App";
+import "@/styles/globals.css";
 
-export {};
+const container = document.getElementById("root");
+if (!container) throw new Error("Root element #root not found");
 
-// TODO(S03-T04): createRoot(document.getElementById("root")!).render(<App />);
+createRoot(container).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);
