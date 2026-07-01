@@ -11,6 +11,9 @@
     "apps/desktop/ui"
   ],
   "scripts": {
-    "//": "TODO(S03-T02/S03-T06): Wire bootstrap, build, lint, typecheck, and contract-generation scripts."
+    "//": "TODO(S03-T02/S03-T06): Wire bootstrap, build, lint, typecheck, and contract-generation scripts.",
+    "check:boundaries": "npx --yes tsx scripts/agent-boundary-check.ts",
+    "typecheck": "npx --yes -p typescript tsc --noEmit",
+    "validate": "npm run check:boundaries && npm run typecheck"
   }
 }
