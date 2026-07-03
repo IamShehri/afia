@@ -76,7 +76,10 @@ def list_models():
 @app.post("/analyze")
 def analyze(req: AnalyzeRequest):
     try:
-        result = openmed.analyze_text(req.text)
+        if req.model:
+            result = openmed.analyze_text(req.text, model=req.model)
+        else:
+            result = openmed.analyze_text(req.text)
         return {
             "text": result.text,
             "model": result.model_name,
@@ -194,6 +197,7 @@ async def render_page(
 class ChunkAnalyzeRequest(BaseModel):
     text: str
     chunk_size: Optional[int] = 3000
+    model: Optional[str] = None
 
 @app.post("/analyze-document")
 def analyze_document(req: ChunkAnalyzeRequest):
@@ -206,7 +210,10 @@ def analyze_document(req: ChunkAnalyzeRequest):
             chunk = text[i:i + chunk_size]
             if not chunk.strip():
                 continue
-            result = openmed.analyze_text(chunk)
+            if req.model:
+                result = openmed.analyze_text(chunk, model=req.model)
+            else:
+                result = openmed.analyze_text(chunk)
             for e in result.entities:
                 all_entities.append({
                     "text": e.text,
