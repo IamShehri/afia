@@ -1,9 +1,15 @@
 from fastapi import FastAPI, HTTPException
+from fastapi import File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import openmed
 import uvicorn
+import fitz  # PyMuPDF
+import hashlib
+import io
+import re
+from collections import Counter
 
 app = FastAPI(title="AFIA OpenMed Bridge", version="1.0.0")
 
@@ -21,6 +27,25 @@ class AnalyzeRequest(BaseModel):
 class DeidentifyRequest(BaseModel):
     text: str
     language: Optional[str] = "en"
+
+def split_sentences(text: str) -> list[str]:
+    # Simple sentence splitter
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    return [s.strip() for s in sentences if len(s.strip()) > 10]
+
+def score_sentence(sentence: str, question_words: set) -> float:
+    sentence_words = set(re.findall(r'\b\w+\b', sentence.lower()))
+    overlap = len(question_words & sentence_words)
+    if overlap == 0:
+        return 0.0
+    return overlap / (len(question_words) + 0.001)
+
+STOP_WORDS = {
+    "what", "is", "are", "the", "a", "an", "of", "in", "on",
+    "for", "to", "and", "or", "does", "do", "did", "was",
+    "were", "how", "why", "who", "when", "where", "which",
+    "this", "that", "with", "has", "have", "had"
+}
 
 @app.get("/health")
 def health():
@@ -96,6 +121,134 @@ def extract_pii(req: AnalyzeRequest):
                     "end": e.end,
                 })
         return {"text": req.text, "entities": entities}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/upload-pdf")
+async def upload_pdf(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        digest = hashlib.sha256(content).hexdigest()[:16]
+        
+        doc = fitz.open(stream=content, filetype="pdf")
+        pages = []
+        full_text = ""
+        offset = 0
+        
+        for page_num, page in enumerate(doc):
+            page_text = page.get_text()
+            page_start = offset
+            page_end = offset + len(page_text)
+            
+            pages.append({
+                "page_number": page_num + 1,
+                "text": page_text,
+                "char_start": page_start,
+                "char_end": page_end,
+                "width": page.rect.width,
+                "height": page.rect.height,
+            })
+            
+            full_text += page_text
+            offset = page_end
+        
+        doc.close()
+        
+        return {
+            "document_id": digest,
+            "filename": file.filename,
+            "page_count": len(pages),
+            "full_text": full_text,
+            "pages": pages,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ChunkAnalyzeRequest(BaseModel):
+    text: str
+    chunk_size: Optional[int] = 3000
+
+@app.post("/analyze-document")
+def analyze_document(req: ChunkAnalyzeRequest):
+    try:
+        text = req.text
+        chunk_size = req.chunk_size
+        all_entities = []
+        
+        for i in range(0, len(text), chunk_size):
+            chunk = text[i:i + chunk_size]
+            if not chunk.strip():
+                continue
+            result = openmed.analyze_text(chunk)
+            for e in result.entities:
+                all_entities.append({
+                    "text": e.text,
+                    "label": e.label,
+                    "confidence": e.confidence,
+                    "start": e.start + i,
+                    "end": e.end + i,
+                })
+        
+        return {
+            "text": text,
+            "entities": all_entities,
+            "chunk_count": (len(text) // chunk_size) + 1,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class AskDocumentRequest(BaseModel):
+    text: str
+    question: str
+    top_k: Optional[int] = 3
+
+@app.post("/ask-document")
+def ask_document(req: AskDocumentRequest):
+    try:
+        sentences = split_sentences(req.text)
+        question_words = set(re.findall(r'\b\w+\b', req.question.lower()))
+        question_words = question_words - STOP_WORDS
+        
+        if not question_words:
+            return {
+                "question": req.question,
+                "answer": "Please ask a more specific question.",
+                "sources": [],
+            }
+        
+        scored = []
+        offset = 0
+        for sent in sentences:
+            score = score_sentence(sent, question_words)
+            idx = req.text.find(sent, offset)
+            if idx == -1:
+                idx = offset
+            if score > 0:
+                scored.append({
+                    "text": sent,
+                    "score": round(score, 3),
+                    "start": idx,
+                    "end": idx + len(sent),
+                })
+            offset = idx + len(sent)
+        
+        scored.sort(key=lambda x: x["score"], reverse=True)
+        top_results = scored[:req.top_k]
+        
+        if not top_results:
+            return {
+                "question": req.question,
+                "answer": "I couldn't find relevant information in this document for that question.",
+                "sources": [],
+            }
+        
+        answer = " ".join([r["text"] for r in top_results[:2]])
+        
+        return {
+            "question": req.question,
+            "answer": answer,
+            "sources": top_results,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
