@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi import File, UploadFile
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -161,6 +162,32 @@ async def upload_pdf(file: UploadFile = File(...)):
             "full_text": full_text,
             "pages": pages,
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/render-page")
+async def render_page(
+    file: UploadFile = File(...),
+    page_number: int = 1,
+):
+    try:
+        content = await file.read()
+        doc = fitz.open(stream=content, filetype="pdf")
+        
+        if page_number < 1 or page_number > len(doc):
+            raise HTTPException(status_code=400, detail="Invalid page number")
+        
+        page = doc[page_number - 1]
+        # Render at 2x zoom for crisp display
+        mat = fitz.Matrix(2, 2)
+        pix = page.get_pixmap(matrix=mat)
+        img_bytes = pix.tobytes("png")
+        
+        doc.close()
+        
+        return Response(content=img_bytes, media_type="image/png")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
