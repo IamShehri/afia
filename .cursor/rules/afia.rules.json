@@ -1,0 +1,40 @@
+{
+  "name": "AFIA Architecture Rules",
+  "description": "Enforces clinical module isolation + timeline composition constraints",
+  "rules": [
+    {
+      "id": "RULE_A_TIMELINE_ISOLATION",
+      "pattern": "app/(app)/patients/**/timeline/**",
+      "forbiddenImports": [
+        "@/lib/notes",
+        "@/lib/patients",
+        "@/lib/labs",
+        "@/lib/medications"
+      ],
+      "message": "Timeline page must only use lib/clinical-timeline.ts"
+    },
+    {
+      "id": "RULE_B_SINGLE_COMPOSER",
+      "pattern": "!(lib/clinical-timeline.ts)",
+      "forbiddenBehavior": [
+        "multi_module_imports",
+        "array_merge_clinical_events",
+        "timeline_sort_logic"
+      ],
+      "message": "Only clinical-timeline.ts can compose ClinicalEvent streams"
+    },
+    {
+      "id": "RULE_C_PATIENTS_ISOLATION",
+      "pattern": "lib/patients.ts",
+      "forbiddenImports": [
+        "@/lib/notes",
+        "@/lib/labs",
+        "@/lib/medications"
+      ],
+      "allowedImports": [
+        "@/lib/clinical-event"
+      ],
+      "message": "Patients module must not depend on clinical modules"
+    }
+  ]
+}
