@@ -77,7 +77,7 @@ def list_models():
 def analyze(req: AnalyzeRequest):
     try:
         if req.model:
-            result = openmed.analyze_text(req.text, model=req.model)
+            result = openmed.analyze_text(req.text, model_name=req.model)
         else:
             result = openmed.analyze_text(req.text)
         return {
@@ -211,7 +211,7 @@ def analyze_document(req: ChunkAnalyzeRequest):
             if not chunk.strip():
                 continue
             if req.model:
-                result = openmed.analyze_text(chunk, model=req.model)
+                result = openmed.analyze_text(chunk, model_name=req.model)
             else:
                 result = openmed.analyze_text(chunk)
             for e in result.entities:
