@@ -36,3 +36,5 @@ Thumbs.db
 # Generated search indexes, thumbnails, logs (derived; excluded from backups)
 /cache
 /logs
+
+afia-ui/.env
