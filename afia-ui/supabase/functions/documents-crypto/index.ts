@@ -21,6 +21,15 @@ type DocumentRow = {
   updated_at: string;
 };
 
+type ListRow = {
+  id: string;
+  bridge_document_id: string;
+  title_encrypted: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
 type MetadataRecord = Record<string, unknown>;
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -144,6 +153,27 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+async function writeAudit(
+  supabase: SupabaseClient,
+  userId: string,
+  action: string,
+  resourceId: string,
+): Promise<void> {
+  try {
+    const { error } = await supabase.from("audit_log").insert({
+      user_id: userId,
+      action,
+      resource_type: "document",
+      resource_id: resourceId,
+    });
+    if (error) {
+      console.error("[audit] insert failed:", error.message);
+    }
+  } catch (err) {
+    console.error("[audit] insert failed:", err);
+  }
+}
+
 async function toDecryptedDocument(row: DocumentRow) {
   const title = await decryptField(row.title_encrypted);
   const content = row.content_encrypted
@@ -163,7 +193,7 @@ async function toDecryptedDocument(row: DocumentRow) {
   };
 }
 
-async function toListDocument(row: DocumentRow) {
+async function toListDocument(row: ListRow) {
   const title = await decryptField(row.title_encrypted);
 
   return {
@@ -232,13 +262,17 @@ async function handleCreate(
     );
   }
 
+  const row = data as DocumentRow;
+  await writeAudit(supabase, userId, "create", row.id);
+
   return jsonResponse({
-    document: await toDecryptedDocument(data as DocumentRow),
+    document: await toDecryptedDocument(row),
   });
 }
 
 async function handleUpdate(
   supabase: SupabaseClient,
+  userId: string,
   body: Record<string, unknown>,
 ) {
   const bridgeDocumentId = body.bridge_document_id;
@@ -250,6 +284,7 @@ async function handleUpdate(
     .from("documents")
     .select("*")
     .eq("bridge_document_id", bridgeDocumentId)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (fetchError) {
@@ -295,6 +330,7 @@ async function handleUpdate(
     .from("documents")
     .update(updatePayload)
     .eq("bridge_document_id", bridgeDocumentId)
+    .eq("user_id", userId)
     .select("*")
     .single();
 
@@ -305,13 +341,17 @@ async function handleUpdate(
     );
   }
 
+  const updated = data as DocumentRow;
+  await writeAudit(supabase, userId, "update", updated.id);
+
   return jsonResponse({
-    document: await toDecryptedDocument(data as DocumentRow),
+    document: await toDecryptedDocument(updated),
   });
 }
 
 async function handleGet(
   supabase: SupabaseClient,
+  userId: string,
   body: Record<string, unknown>,
 ) {
   const bridgeDocumentId = body.bridge_document_id;
@@ -323,6 +363,7 @@ async function handleGet(
     .from("documents")
     .select("*")
     .eq("bridge_document_id", bridgeDocumentId)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) {
@@ -332,15 +373,20 @@ async function handleGet(
     return jsonResponse({ document: null });
   }
 
+  const row = data as DocumentRow;
+  await writeAudit(supabase, userId, "view", row.id);
+
   return jsonResponse({
-    document: await toDecryptedDocument(data as DocumentRow),
+    document: await toDecryptedDocument(row),
   });
 }
 
 async function handleList(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("documents")
-    .select("*")
+    .select(
+      "id, bridge_document_id, title_encrypted, status, created_at, updated_at",
+    )
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -348,7 +394,7 @@ async function handleList(supabase: SupabaseClient) {
   }
 
   const documents = await Promise.all(
-    ((data ?? []) as DocumentRow[]).map((row) => toListDocument(row)),
+    ((data ?? []) as ListRow[]).map((row) => toListDocument(row)),
   );
 
   return jsonResponse({ documents });
@@ -356,6 +402,7 @@ async function handleList(supabase: SupabaseClient) {
 
 async function handleDelete(
   supabase: SupabaseClient,
+  userId: string,
   body: Record<string, unknown>,
 ) {
   const bridgeDocumentId = body.bridge_document_id;
@@ -363,13 +410,20 @@ async function handleDelete(
     return jsonResponse({ error: "bridge_document_id is required" }, 400);
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("documents")
     .delete()
-    .eq("bridge_document_id", bridgeDocumentId);
+    .eq("bridge_document_id", bridgeDocumentId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     return jsonResponse({ error: error.message }, 500);
+  }
+
+  if (data) {
+    await writeAudit(supabase, userId, "delete", (data as { id: string }).id);
   }
 
   return jsonResponse({ ok: true });
@@ -416,13 +470,13 @@ Deno.serve(async (req) => {
       case "create":
         return await handleCreate(supabase, user.id, body);
       case "update":
-        return await handleUpdate(supabase, body);
+        return await handleUpdate(supabase, user.id, body);
       case "get":
-        return await handleGet(supabase, body);
+        return await handleGet(supabase, user.id, body);
       case "list":
         return await handleList(supabase);
       case "delete":
-        return await handleDelete(supabase, body);
+        return await handleDelete(supabase, user.id, body);
       default:
         return jsonResponse(
           { error: `Unknown action: ${String(action)}` },

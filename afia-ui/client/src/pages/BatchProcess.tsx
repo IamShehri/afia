@@ -6,8 +6,7 @@ import { PageHeader } from "@/components/primitives";
 import { cn } from "@/lib/utils";
 import { uploadPDF, analyzeDocument } from "@/services/openmed-client";
 import { saveDocument } from "@/lib/documents";
-import { logAction } from "@/lib/audit";
-import { getActiveModel } from "@/services/model-preference";
+import { resolveAnalysisModel } from "@/services/model-preference";
 import { FileText, Upload, Loader2, ExternalLink } from "lucide-react";
 
 type FileStatus = "queued" | "uploading" | "analyzing" | "done" | "error";
@@ -78,7 +77,7 @@ export default function BatchProcess() {
         const result = await analyzeDocument(
           doc.full_text,
           3000,
-          getActiveModel() ?? undefined,
+          await resolveAnalysisModel(),
         );
         await saveDocument({
           id: doc.document_id,
@@ -91,7 +90,6 @@ export default function BatchProcess() {
           uploadedAt: Date.now(),
           lastAccessedAt: Date.now(),
         });
-        logAction("create", "document", doc.document_id);
         updateFile(index, { status: "done", documentId: doc.document_id });
       } catch (e) {
         updateFile(index, {

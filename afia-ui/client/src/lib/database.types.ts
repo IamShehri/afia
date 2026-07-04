@@ -35,9 +35,9 @@ export interface Database {
           id: string;
           bridge_document_id: string;
           user_id: string;
-          title: string | null;
-          content: string | null;
-          metadata: Json | null;
+          title_encrypted: string;
+          content_encrypted: string | null;
+          metadata_encrypted: string | null;
           status: string;
           created_at: string;
           updated_at: string;
@@ -46,9 +46,9 @@ export interface Database {
           id?: string;
           bridge_document_id: string;
           user_id: string;
-          title?: string | null;
-          content?: string | null;
-          metadata?: Json | null;
+          title_encrypted: string;
+          content_encrypted?: string | null;
+          metadata_encrypted?: string | null;
           status?: string;
           created_at?: string;
           updated_at?: string;
@@ -57,9 +57,9 @@ export interface Database {
           id?: string;
           bridge_document_id?: string;
           user_id?: string;
-          title?: string | null;
-          content?: string | null;
-          metadata?: Json | null;
+          title_encrypted?: string;
+          content_encrypted?: string | null;
+          metadata_encrypted?: string | null;
           status?: string;
           created_at?: string;
           updated_at?: string;

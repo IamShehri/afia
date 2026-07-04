@@ -1,9 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi import File, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+import asyncio
+import json
 import openmed
 import uvicorn
 import fitz  # PyMuPDF
@@ -11,8 +13,164 @@ import hashlib
 import io
 import re
 from collections import Counter
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
 app = FastAPI(title="AFIA OpenMed Bridge", version="1.0.0")
+
+# --- HuggingFace model availability cache -----------------------------------
+
+CACHE_DIR = Path.home() / ".cache" / "afia"
+CACHE_FILE = CACHE_DIR / "model_availability.json"
+CACHE_TTL = timedelta(days=7)
+HF_HEAD_TIMEOUT = 3
+_HF_CHECK_CONCURRENCY = 10
+
+_availability_cache: dict[str, dict] = {}
+_cache_loaded = False
+
+
+def _ensure_cache_loaded() -> None:
+    global _cache_loaded
+    if _cache_loaded:
+        return
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    if CACHE_FILE.exists():
+        try:
+            raw = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                _availability_cache.update(raw)
+        except (json.JSONDecodeError, OSError):
+            pass
+    _cache_loaded = True
+
+
+def _save_cache_to_disk() -> None:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        CACHE_FILE.write_text(
+            json.dumps(_availability_cache, indent=2),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
+def _is_cache_fresh(entry: dict) -> bool:
+    checked_at = entry.get("checked_at")
+    if not checked_at:
+        return False
+    try:
+        ts = datetime.fromisoformat(str(checked_at))
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) - ts < CACHE_TTL
+    except ValueError:
+        return False
+
+
+def _head_hf_model_sync(model_id: str) -> Optional[bool]:
+    """HEAD HuggingFace config.json. True/False if known, None on network error."""
+    url = f"https://huggingface.co/{model_id}/resolve/main/config.json"
+    req = urlrequest.Request(url, method="HEAD")
+    try:
+        with urlrequest.urlopen(req, timeout=HF_HEAD_TIMEOUT) as resp:
+            return resp.status == 200
+    except urlerror.HTTPError as exc:
+        if exc.code in (401, 404):
+            return False
+        return None
+    except (urlerror.URLError, TimeoutError, OSError):
+        return None
+
+
+async def model_exists_on_hf(model_id: str) -> Optional[bool]:
+    """
+    Verify model exists on HuggingFace.
+    Returns True/False when determined; None if network failed and no cache.
+    """
+    _ensure_cache_loaded()
+    entry = _availability_cache.get(model_id)
+    if entry and _is_cache_fresh(entry):
+        return bool(entry["exists"])
+
+    result = await asyncio.to_thread(_head_hf_model_sync, model_id)
+
+    if result is None:
+        if entry:
+            return bool(entry["exists"])
+        return None
+
+    _availability_cache[model_id] = {
+        "exists": result,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _save_cache_to_disk()
+    return result
+
+
+def mark_model_unavailable(model_id: str) -> None:
+    _ensure_cache_loaded()
+    _availability_cache[model_id] = {
+        "exists": False,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _save_cache_to_disk()
+
+
+async def _should_include_model(model_id: str) -> bool:
+    exists = await model_exists_on_hf(model_id)
+    if exists is False:
+        return False
+    return True
+
+
+async def filter_available_models(model_ids: list[str]) -> list[str]:
+    sem = asyncio.Semaphore(_HF_CHECK_CONCURRENCY)
+
+    async def check_one(model_id: str) -> tuple[str, bool]:
+        async with sem:
+            include = await _should_include_model(model_id)
+            return model_id, include
+
+    results = await asyncio.gather(*(check_one(m) for m in model_ids))
+    return [model_id for model_id, include in results if include]
+
+
+def _is_model_unavailable_error(exc: Exception) -> bool:
+    name = type(exc).__name__
+    if "RepositoryNotFound" in name or "EntryNotFound" in name:
+        return True
+    msg = str(exc).lower()
+    return (
+        "repositorynotfound" in msg
+        or "repository not found" in msg
+        or ("401" in msg and "huggingface" in msg)
+    )
+
+
+def _group_openmed_models(model_ids: list[str]) -> dict:
+    grouped = {
+        "ner": [],
+        "pii": [],
+        "zeroshot": [],
+        "other": [],
+    }
+    for m in model_ids:
+        name = m.split("/")[-1]
+        if "NER-" in m and "ZeroShot" not in m:
+            grouped["ner"].append({"id": m, "name": name})
+        elif "PII" in m:
+            grouped["pii"].append({"id": m, "name": name})
+        elif "ZeroShot" in m:
+            grouped["zeroshot"].append({"id": m, "name": name})
+        else:
+            grouped["other"].append({"id": m, "name": name})
+    return grouped
+
+# --- App middleware ---------------------------------------------------------
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,25 +211,10 @@ def health():
     return {"status": "ok", "version": openmed.__version__}
 
 @app.get("/models")
-def list_models():
+async def list_models():
     all_models = openmed.list_models()
-    grouped = {
-        "ner": [],
-        "pii": [],
-        "zeroshot": [],
-        "other": []
-    }
-    for m in all_models:
-        name = m.split("/")[-1]
-        if "NER-" in m and "ZeroShot" not in m:
-            grouped["ner"].append({"id": m, "name": name})
-        elif "PII" in m:
-            grouped["pii"].append({"id": m, "name": name})
-        elif "ZeroShot" in m:
-            grouped["zeroshot"].append({"id": m, "name": name})
-        else:
-            grouped["other"].append({"id": m, "name": name})
-    return grouped
+    available = await filter_available_models(all_models)
+    return _group_openmed_models(available)
 
 @app.post("/analyze")
 def analyze(req: AnalyzeRequest):
@@ -205,7 +348,7 @@ def analyze_document(req: ChunkAnalyzeRequest):
         text = req.text
         chunk_size = req.chunk_size
         all_entities = []
-        
+
         for i in range(0, len(text), chunk_size):
             chunk = text[i:i + chunk_size]
             if not chunk.strip():
@@ -222,13 +365,19 @@ def analyze_document(req: ChunkAnalyzeRequest):
                     "start": e.start + i,
                     "end": e.end + i,
                 })
-        
+
         return {
             "text": text,
             "entities": all_entities,
             "chunk_count": (len(text) // chunk_size) + 1,
         }
     except Exception as e:
+        if req.model and _is_model_unavailable_error(e):
+            mark_model_unavailable(req.model)
+            return JSONResponse(
+                status_code=422,
+                content={"error": "model_unavailable", "model": req.model},
+            )
         raise HTTPException(status_code=500, detail=str(e))
 
 class AskDocumentRequest(BaseModel):

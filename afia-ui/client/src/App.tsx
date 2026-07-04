@@ -24,6 +24,8 @@ import Models from "./pages/Models";
 import Insights from "./pages/Insights";
 import { Loader2 } from "lucide-react";
 import Settings from "./pages/Settings";
+import { useEffect } from "react";
+import { preloadDefaultAnalysisModel } from "./services/model-preference";
 
 function AuthLoading() {
   return (
@@ -76,6 +78,10 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    preloadDefaultAnalysisModel();
+  }, []);
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>

@@ -36,14 +36,16 @@ begin
 end;
 $$;
 
--- Documents (per-user; bridge digest scoped by user_id)
+-- Documents (per-user; encrypted fields via documents-crypto Edge Function)
+-- title, content, and metadata are stored as base64 AES-256-GCM ciphertext.
+-- Client must NOT read/write those columns directly — use the Edge Function.
 create table if not exists public.documents (
   id uuid primary key default gen_random_uuid(),
   bridge_document_id text not null,
   user_id uuid not null references auth.users (id) on delete cascade,
-  title text,
-  content text,
-  metadata jsonb,
+  title_encrypted text not null,
+  content_encrypted text,
+  metadata_encrypted text,
   status text not null default 'new',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

@@ -13,7 +13,12 @@ import {
   getActiveModel,
   setActiveModel,
 } from "@/services/model-preference";
-import { Sparkles, Search, AlertCircle, X, Check } from "lucide-react";
+import {
+  isMacOS,
+  isMlxModel,
+  isModelCompatibleOnPlatform,
+} from "@/lib/model-platform";
+import { Sparkles, Search, AlertCircle, X, Check, Loader2 } from "lucide-react";
 
 type Category = "ner" | "pii" | "zeroshot" | "other";
 
@@ -40,21 +45,24 @@ function parseSize(name: string): string | null {
 function ModelCard({
   model,
   isActive,
+  incompatible,
   onSelect,
 }: {
   model: ModelInfo;
   isActive: boolean;
+  incompatible: boolean;
   onSelect: () => void;
 }) {
   const display = cleanName(model.name || model.id);
   const size = parseSize(model.id) ?? parseSize(model.name);
-  const isMlx = /mlx/i.test(model.id) || /mlx/i.test(model.name);
+  const isMlx = isMlxModel(model.id);
 
   return (
     <Card
       className={cn(
         "transition-shadow hover:shadow-md",
         isActive && "border-primary",
+        incompatible && "opacity-75",
       )}
     >
       <CardContent className="flex h-full flex-col gap-3">
@@ -74,6 +82,11 @@ function ModelCard({
               MLX
             </span>
           )}
+          {incompatible && (
+            <span className="rounded border border-warning/25 bg-warning/10 px-1.5 py-0.5 text-[11px] font-medium text-warning">
+              Apple Silicon only
+            </span>
+          )}
         </div>
         <div className="mt-auto flex items-center justify-between gap-2">
           <span className="truncate font-mono text-[11px] text-muted-foreground">
@@ -85,7 +98,17 @@ function ModelCard({
               Active
             </Button>
           ) : (
-            <Button size="sm" variant="outline" onClick={onSelect}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onSelect}
+              disabled={incompatible}
+              title={
+                incompatible
+                  ? "MLX models require macOS with Apple Silicon"
+                  : undefined
+              }
+            >
               Select
             </Button>
           )}
@@ -95,15 +118,16 @@ function ModelCard({
   );
 }
 
-function SkeletonGrid() {
+function VerifyingModelsState() {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div
-          key={i}
-          className="h-28 animate-pulse rounded-xl border border-hairline bg-elevated"
-        />
-      ))}
+    <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-hairline bg-surface px-6 py-16 text-center">
+      <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      <div className="space-y-1">
+        <p className="text-sm font-medium">Verifying model availability…</p>
+        <p className="text-xs text-muted-foreground">
+          First run takes ~1 min while the bridge checks HuggingFace
+        </p>
+      </div>
     </div>
   );
 }
@@ -116,6 +140,8 @@ export default function Models() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showBanner, setShowBanner] = useState(true);
   const [activeModel, setActiveModelState] = useState<string | null>(null);
+  const [hideIncompatible, setHideIncompatible] = useState(!isMacOS());
+  const onNonMac = !isMacOS();
 
   useEffect(() => {
     setActiveModelState(getActiveModel());
@@ -157,12 +183,16 @@ export default function Models() {
   const filtered = useMemo(() => {
     const list = models?.[activeCategory] ?? [];
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
+    let result = list;
+    if (hideIncompatible) {
+      result = result.filter((m) => isModelCompatibleOnPlatform(m.id));
+    }
+    if (!q) return result;
+    return result.filter(
       (m) =>
         m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q),
     );
-  }, [models, activeCategory, searchQuery]);
+  }, [models, activeCategory, searchQuery, hideIncompatible]);
 
   const activeModelName = useMemo(() => {
     if (!activeModel || !models) return null;
@@ -174,6 +204,10 @@ export default function Models() {
   }, [activeModel, models]);
 
   const handleSelect = (model: ModelInfo) => {
+    if (!isModelCompatibleOnPlatform(model.id)) {
+      toast.error("MLX models require macOS with Apple Silicon.");
+      return;
+    }
     setActiveModel(model.id);
     setActiveModelState(model.id);
     toast.success(`Active model: ${cleanName(model.name || model.id)}`);
@@ -191,6 +225,18 @@ export default function Models() {
           title="Model Library"
           subtitle="Browse and select OpenMed models for your analysis"
         />
+
+        {onNonMac && (
+          <div className="flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/10 p-3 text-sm">
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-warning" />
+            <span className="flex-1">
+              Models ending in{" "}
+              <span className="font-mono">-mlx</span> are Apple Silicon only
+              and will not run on Windows or Linux. Analysis uses the first
+              compatible NER model from the bridge when none is selected.
+            </span>
+          </div>
+        )}
 
         {showBanner && (
           <div className="flex items-start gap-2 rounded-lg border border-ai/25 bg-ai/10 p-3 text-sm">
@@ -243,32 +289,49 @@ export default function Models() {
               key={t.id}
               type="button"
               onClick={() => setActiveCategory(t.id)}
+              disabled={loading}
               className={cn(
                 "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
                 activeCategory === t.id
                   ? "border-primary text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground",
+                loading && "pointer-events-none opacity-60",
               )}
             >
-              {t.label} ({counts[t.id]})
+              {loading ? t.label : `${t.label} (${counts[t.id]})`}
             </button>
           ))}
         </div>
 
-        {/* Search */}
-        <div className="relative max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search models…"
-            className="pl-8"
-          />
+        {/* Search + incompatible toggle */}
+        {!loading && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative max-w-sm flex-1">
+            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search models…"
+              className="pl-8"
+            />
+          </div>
+          {onNonMac && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={hideIncompatible}
+                onChange={(e) => setHideIncompatible(e.target.checked)}
+                className="size-4 rounded border-hairline"
+              />
+              Hide Apple Silicon–only models
+            </label>
+          )}
         </div>
+        )}
 
         {/* Content */}
         {loading ? (
-          <SkeletonGrid />
+          <VerifyingModelsState />
         ) : filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {error
@@ -284,6 +347,7 @@ export default function Models() {
                 key={m.id}
                 model={m}
                 isActive={m.id === activeModel}
+                incompatible={!isModelCompatibleOnPlatform(m.id)}
                 onSelect={() => handleSelect(m)}
               />
             ))}

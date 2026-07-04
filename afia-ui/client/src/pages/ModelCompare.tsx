@@ -24,6 +24,11 @@ import {
   type AnalyzeResult,
 } from "@/services/openmed-client";
 import {
+  filterCompatibleModels,
+  isModelCompatibleOnPlatform,
+  isMlxModel,
+} from "@/lib/model-platform";
+import {
   Boxes,
   GitCompare,
   Loader2,
@@ -102,11 +107,15 @@ function ModelCombobox({
           <CommandList>
             <CommandEmpty>No models found.</CommandEmpty>
             <CommandGroup>
-              {shown.map((m) => (
+              {shown.map((m) => {
+                const incompatible = !isModelCompatibleOnPlatform(m.id);
+                return (
                 <CommandItem
                   key={m.id}
                   value={m.id}
+                  disabled={incompatible}
                   onSelect={() => {
+                    if (incompatible) return;
                     onChange(m.id);
                     setOpen(false);
                   }}
@@ -118,8 +127,14 @@ function ModelCombobox({
                     )}
                   />
                   <span className="truncate">{cleanName(m.name || m.id)}</span>
+                  {isMlxModel(m.id) && (
+                    <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+                      {incompatible ? "Apple Silicon only" : "MLX"}
+                    </span>
+                  )}
                 </CommandItem>
-              ))}
+              );
+              })}
             </CommandGroup>
             {filtered.length > shown.length && (
               <div className="px-2 py-1.5 text-xs text-muted-foreground">
@@ -246,12 +261,14 @@ export default function ModelCompare() {
     getModels()
       .then((data) => {
         if (!active) return;
-        setAvailableModels([
-          ...data.ner,
-          ...data.pii,
-          ...data.zeroshot,
-          ...data.other,
-        ]);
+        setAvailableModels(
+          filterCompatibleModels([
+            ...data.ner,
+            ...data.pii,
+            ...data.zeroshot,
+            ...data.other,
+          ]),
+        );
       })
       .catch((e) => {
         if (active)

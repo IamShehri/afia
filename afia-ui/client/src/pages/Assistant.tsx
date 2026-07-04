@@ -13,7 +13,7 @@ import {
   type DeidentifyResult,
   type OpenMedEntity,
 } from "@/services/openmed-client";
-import { getActiveModel } from "@/services/model-preference";
+import { resolveAnalysisModel } from "@/services/model-preference";
 import { ScanText, Shield, EyeOff, Loader2, AlertCircle } from "lucide-react";
 
 type Result =
@@ -117,7 +117,7 @@ export default function Assistant() {
         const data =
           kind === "pii"
             ? await extractPII(text)
-            : await analyzeText(text, getActiveModel() ?? undefined);
+            : await analyzeText(text, await resolveAnalysisModel());
         setResult({ kind, data });
       }
     } catch (e) {

@@ -1,7 +1,4 @@
 import { supabase } from "@/lib/supabase";
-import type { Database, Json } from "@/lib/database.types";
-
-type DocumentRow = Database["public"]["Tables"]["documents"]["Row"];
 
 export type DocumentStatus = "new" | "in_progress" | "reviewed";
 
@@ -54,53 +51,62 @@ export interface DocumentPatch {
   status?: DocumentStatus;
 }
 
+/** Decrypted document payload returned by documents-crypto Edge Function. */
+interface CryptoDocument {
+  id: string;
+  rowId: string;
+  title: string;
+  content: string;
+  metadata: DocumentMetadata;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 function parseStatus(value: string | null | undefined): DocumentStatus {
   if (value === "in_progress" || value === "reviewed") return value;
   return "new";
 }
 
-function rowToStoredDocument(row: DocumentRow): StoredDocument {
-  const meta = (row.metadata as DocumentMetadata | null) ?? {};
+function cryptoDocToStored(doc: CryptoDocument): StoredDocument {
+  const meta = doc.metadata ?? {};
   return {
-    id: row.bridge_document_id,
-    rowId: row.id,
-    filename: row.title ?? "",
-    full_text: row.content ?? "",
+    id: doc.id,
+    rowId: doc.rowId,
+    filename: doc.title,
+    full_text: doc.content,
     page_count: meta.page_count ?? 0,
-    status: parseStatus(row.status),
+    status: parseStatus(doc.status),
     entities: meta.entities ?? [],
     qaHistory: meta.qa_history ?? [],
     uploadedAt:
-      meta.uploaded_at ?? new Date(row.created_at).getTime(),
+      meta.uploaded_at ?? new Date(doc.created_at).getTime(),
     lastAccessedAt:
-      meta.last_accessed_at ?? new Date(row.updated_at).getTime(),
+      meta.last_accessed_at ?? new Date(doc.updated_at).getTime(),
   };
 }
 
-function mergeMetadata(
-  existing: DocumentMetadata,
-  patch: DocumentMetadata,
-): DocumentMetadata {
-  const now = Date.now();
-  return {
-    page_count: patch.page_count ?? existing.page_count ?? 0,
-    entities: patch.entities ?? existing.entities ?? [],
-    qa_history: patch.qa_history ?? existing.qa_history ?? [],
-    uploaded_at: patch.uploaded_at ?? existing.uploaded_at ?? now,
-    last_accessed_at:
-      patch.last_accessed_at ?? existing.last_accessed_at ?? now,
-  };
-}
+async function invokeDocumentsCrypto<T>(
+  body: Record<string, unknown>,
+): Promise<T> {
+  const { data, error } = await supabase.functions.invoke("documents-crypto", {
+    body,
+  });
 
-async function requireUserId(): Promise<string> {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) {
-    throw new Error("Not authenticated");
+  if (error) {
+    throw new Error(error.message);
   }
-  return user.id;
+
+  if (
+    data &&
+    typeof data === "object" &&
+    "error" in data &&
+    typeof (data as { error: unknown }).error === "string"
+  ) {
+    throw new Error((data as { error: string }).error);
+  }
+
+  return data as T;
 }
 
 export async function createDocument(
@@ -108,117 +114,74 @@ export async function createDocument(
   content: string,
   options: CreateDocumentOptions,
 ): Promise<StoredDocument> {
-  const userId = await requireUserId();
   const now = Date.now();
-  const metadata = mergeMetadata(
-    { uploaded_at: now, last_accessed_at: now },
-    options.metadata ?? {},
-  );
+  const metadata: DocumentMetadata = {
+    uploaded_at: now,
+    last_accessed_at: now,
+    ...options.metadata,
+  };
 
-  const { data, error } = await supabase
-    .from("documents")
-    .upsert(
-      {
-        user_id: userId,
-        bridge_document_id: options.bridgeDocumentId,
-        title,
-        content,
-        metadata: metadata as Json,
-        status: options.status ?? "new",
-      },
-      { onConflict: "user_id,bridge_document_id" },
-    )
-    .select()
-    .single();
+  const { document } = await invokeDocumentsCrypto<{ document: CryptoDocument }>({
+    action: "create",
+    bridge_document_id: options.bridgeDocumentId,
+    title,
+    content,
+    metadata,
+    status: options.status ?? "new",
+  });
 
-  if (error || !data) {
-    throw new Error(error?.message ?? "Failed to create document");
-  }
-
-  return rowToStoredDocument(data);
+  return cryptoDocToStored(document);
 }
 
 export async function listDocuments(): Promise<StoredDocument[]> {
-  const { data, error } = await supabase
-    .from("documents")
-    .select("*")
-    .order("updated_at", { ascending: false });
+  const { documents } = await invokeDocumentsCrypto<{
+    documents: CryptoDocument[];
+  }>({ action: "list" });
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return (data ?? []).map(rowToStoredDocument);
+  return (documents ?? []).map(cryptoDocToStored);
 }
 
 export async function getDocument(
   bridgeDocumentId: string,
 ): Promise<StoredDocument | null> {
-  const { data, error } = await supabase
-    .from("documents")
-    .select("*")
-    .eq("bridge_document_id", bridgeDocumentId)
-    .maybeSingle();
+  const { document } = await invokeDocumentsCrypto<{
+    document: CryptoDocument | null;
+  }>({
+    action: "get",
+    bridge_document_id: bridgeDocumentId,
+  });
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data ? rowToStoredDocument(data) : null;
+  return document ? cryptoDocToStored(document) : null;
 }
 
 export async function updateDocument(
   bridgeDocumentId: string,
   patch: DocumentPatch,
 ): Promise<StoredDocument> {
-  const { data: row, error: fetchError } = await supabase
-    .from("documents")
-    .select("*")
-    .eq("bridge_document_id", bridgeDocumentId)
-    .maybeSingle();
+  const body: Record<string, unknown> = {
+    action: "update",
+    bridge_document_id: bridgeDocumentId,
+  };
 
-  if (fetchError) {
-    throw new Error(fetchError.message);
-  }
-  if (!row) {
-    throw new Error("Document not found");
-  }
+  if (patch.title !== undefined) body.title = patch.title;
+  if (patch.content !== undefined) body.content = patch.content;
+  if (patch.status !== undefined) body.status = patch.status;
+  if (patch.metadata !== undefined) body.metadata = patch.metadata;
 
-  const existingMeta = (row.metadata as DocumentMetadata | null) ?? {};
-  const mergedMetadata = patch.metadata
-    ? mergeMetadata(existingMeta, patch.metadata)
-    : existingMeta;
+  const { document } = await invokeDocumentsCrypto<{ document: CryptoDocument }>(
+    body,
+  );
 
-  const { data, error } = await supabase
-    .from("documents")
-    .update({
-      ...(patch.title !== undefined ? { title: patch.title } : {}),
-      ...(patch.content !== undefined ? { content: patch.content } : {}),
-      ...(patch.status !== undefined ? { status: patch.status } : {}),
-      metadata: mergedMetadata as Json,
-    })
-    .eq("bridge_document_id", bridgeDocumentId)
-    .select()
-    .single();
-
-  if (error || !data) {
-    throw new Error(error?.message ?? "Failed to update document");
-  }
-
-  return rowToStoredDocument(data);
+  return cryptoDocToStored(document);
 }
 
 export async function deleteDocument(
   bridgeDocumentId: string,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("documents")
-    .delete()
-    .eq("bridge_document_id", bridgeDocumentId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  await invokeDocumentsCrypto<{ ok: boolean }>({
+    action: "delete",
+    bridge_document_id: bridgeDocumentId,
+  });
 }
 
 /** Upsert helper used by existing upload/save flows. */

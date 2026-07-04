@@ -23,7 +23,7 @@ import {
   type DocumentStatus,
 } from "@/lib/documents";
 import { logAction } from "@/lib/audit";
-import { getActiveModel } from "@/services/model-preference";
+import { resolveAnalysisModel } from "@/services/model-preference";
 import {
   FileText,
   Upload,
@@ -273,7 +273,6 @@ export default function DocumentStudio() {
     getDocument(docId)
       .then((stored: StoredDocument | null) => {
         if (!active || !stored) return;
-        logAction("view", "document", docId);
         setUploadedDoc({
           document_id: stored.id,
           filename: stored.filename,
@@ -364,7 +363,6 @@ export default function DocumentStudio() {
           uploadedAt: Date.now(),
           lastAccessedAt: Date.now(),
         });
-        logAction("update", "document", uploadedDoc.document_id);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Question failed");
@@ -402,7 +400,7 @@ export default function DocumentStudio() {
         const result = await analyzeDocument(
           doc.full_text,
           3000,
-          getActiveModel() ?? undefined,
+          await resolveAnalysisModel(),
         );
         setAnalysisResult(result);
         setStatus("new");
@@ -417,7 +415,6 @@ export default function DocumentStudio() {
           uploadedAt: Date.now(),
           lastAccessedAt: Date.now(),
         });
-        logAction("create", "document", doc.document_id);
       } finally {
         setAnalyzing(false);
       }
@@ -526,9 +523,7 @@ export default function DocumentStudio() {
                         void updateDocumentStatus(
                           uploadedDoc.document_id,
                           next,
-                        ).then(() => {
-                          logAction("update", "document", uploadedDoc.document_id);
-                        });
+                        );
                       }}
                       aria-label="Review status"
                       className={cn(
