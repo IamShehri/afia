@@ -102,10 +102,10 @@ def analyze(req: AnalyzeRequest):
 @app.post("/deidentify")
 def deidentify(req: DeidentifyRequest):
     try:
-        result = openmed.deidentify(req.text, language=req.language)
+        result = openmed.deidentify(req.text, lang=req.language)
         return {
             "original": req.text,
-            "deidentified": result.text if hasattr(result, "text") else str(result),
+            "deidentified": result.deidentified_text,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
