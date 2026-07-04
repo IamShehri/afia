@@ -158,24 +158,63 @@ export interface DocumentSource {
   end: number;
 }
 
+export interface DocumentPassage {
+  text: string;
+  score: number;
+  char_start: number;
+  char_end: number;
+}
+
 export interface AskDocumentResult {
   question: string;
-  answer: string;
-  sources: DocumentSource[];
+  passages: DocumentPassage[];
+  retrieval_model?: string;
+}
+
+export function passagesToSources(
+  passages: DocumentPassage[],
+): DocumentSource[] {
+  return passages.map((p) => ({
+    text: p.text,
+    score: p.score,
+    start: p.char_start,
+    end: p.char_end,
+  }));
 }
 
 export async function askDocument(
   text: string,
   question: string,
-  topK = 3
-): Promise<AskDocumentResult> {
+  topK = 3,
+  documentId?: string,
+): Promise<AskDocumentResult & { sources: DocumentSource[] }> {
   const res = await fetch(`${BASE_URL}/ask-document`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, question, top_k: topK }),
+    body: JSON.stringify({
+      text,
+      question,
+      top_k: topK,
+      ...(documentId ? { document_id: documentId } : {}),
+    }),
   });
-  if (!res.ok) throw new Error("Question failed");
-  return res.json();
+  if (!res.ok) {
+    let message = "Question failed";
+    try {
+      const body = (await res.json()) as { detail?: string };
+      if (typeof body.detail === "string" && body.detail.length > 0) {
+        message = body.detail;
+      }
+    } catch {
+      /* use default message */
+    }
+    throw new Error(message);
+  }
+  const data = (await res.json()) as AskDocumentResult;
+  return {
+    ...data,
+    sources: passagesToSources(data.passages ?? []),
+  };
 }
 
 export interface ModelInfo {

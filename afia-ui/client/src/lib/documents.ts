@@ -12,7 +12,8 @@ export interface DocumentEntity {
 
 export interface DocumentQaEntry {
   question: string;
-  answer: string;
+  /** Legacy generative answer — unused in extractive v1. */
+  answer?: string;
   sources: Array<{ text: string; score: number; start: number; end: number }>;
 }
 

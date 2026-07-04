@@ -1,0 +1,5 @@
+# AFIA OpenMed bridge — Python deps (install with the project venv python):
+#   python -m pip install -r services/requirements-bridge.txt
+#
+# Core bridge deps (openmed, fastapi, uvicorn, pymupdf) are assumed installed separately.
+sentence-transformers==5.6.0

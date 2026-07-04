@@ -76,7 +76,6 @@ function cleanModelLabel(modelId: string): string {
 
 interface QaEntry {
   question: string;
-  answer: string;
   sources: DocumentSource[];
 }
 
@@ -86,83 +85,118 @@ const STATUS_STYLES: Record<DocumentStatus, string> = {
   reviewed: "border-success/25 bg-success/10 text-success",
 };
 
-/* AFIA answer bubble with an expandable Sources section. */
-function AnswerBubble({ entry }: { entry: QaEntry }) {
-  const [showSources, setShowSources] = useState(false);
+/* Extractive Q&A — passage cards (no generative answer). */
+function QaPassageResults({
+  entry,
+  onPassageClick,
+}: {
+  entry: QaEntry;
+  onPassageClick: (source: DocumentSource) => void;
+}) {
   return (
-    <div className="rounded-lg border border-hairline bg-surface p-3">
-      <p className="text-sm leading-relaxed whitespace-pre-wrap">
-        {entry.answer}
-      </p>
-      {entry.sources.length > 0 && (
-        <div className="mt-2 border-t border-hairline pt-2">
+    <div className="space-y-2">
+      {entry.sources.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No relevant passages found in this document.
+        </p>
+      ) : (
+        entry.sources.map((s, i) => (
           <button
+            key={`${s.start}-${s.end}-${i}`}
             type="button"
-            onClick={() => setShowSources((v) => !v)}
-            className="flex items-center gap-1 text-xs font-medium text-muted-foreground"
-            aria-expanded={showSources}
+            onClick={() => onPassageClick(s)}
+            className="flex w-full items-start gap-2 rounded-md border border-hairline bg-surface px-3 py-2 text-left transition-colors hover:border-ai/30 hover:bg-ai/5"
           >
-            {showSources ? (
-              <ChevronDown className="size-3.5" />
-            ) : (
-              <ChevronRight className="size-3.5" />
-            )}
-            Sources ({entry.sources.length})
+            <span className="flex-1 text-sm leading-relaxed">{s.text}</span>
+            <span className="shrink-0 rounded border border-hairline bg-elevated px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+              {(s.score * 100).toFixed(0)}%
+            </span>
           </button>
-          {showSources && (
-            <div className="mt-2 space-y-1.5">
-              {entry.sources.map((s, i) => (
-                <div
-                  key={`${s.start}-${s.end}-${i}`}
-                  className="flex items-start gap-2 rounded-md border border-hairline bg-background px-2.5 py-1.5"
-                >
-                  <span className="flex-1 text-xs leading-relaxed">
-                    {s.text}
-                  </span>
-                  <span className="shrink-0 rounded border border-ai/25 bg-ai/10 px-1.5 py-0.5 font-mono text-[11px] font-medium text-ai">
-                    {(s.score * 100).toFixed(0)}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        ))
       )}
+      <p className="text-xs text-muted-foreground">
+        Showing the most relevant passages from the document
+      </p>
     </div>
   );
 }
 
-/* Renders document text with detected entity spans highlighted inline.
-   Same visual style as Assistant.tsx. */
+/* Renders document text with entity spans and optional passage highlight. */
 function HighlightedText({
   text,
   entities,
+  passageHighlight,
+  passageHighlightRef,
 }: {
   text: string;
   entities: DocumentEntity[];
+  passageHighlight?: { start: number; end: number } | null;
+  passageHighlightRef?: React.RefObject<HTMLSpanElement | null>;
 }) {
-  const sorted = [...entities].sort((a, b) => a.start - b.start);
-  const nodes: ReactNode[] = [];
-  let cursor = 0;
+  type SegmentKind = "plain" | "entity" | "passage";
 
-  sorted.forEach((e, i) => {
-    if (e.start < cursor || e.start > text.length) return;
-    if (e.start > cursor) {
-      nodes.push(<span key={`t${i}`}>{text.slice(cursor, e.start)}</span>);
+  const boundaries = new Set<number>([0, text.length]);
+  for (const e of entities) {
+    if (e.start >= 0 && e.end <= text.length && e.start < e.end) {
+      boundaries.add(e.start);
+      boundaries.add(e.end);
     }
-    nodes.push(
-      <span
-        key={`e${i}`}
-        title={`${e.label} · ${(e.confidence * 100).toFixed(1)}%`}
-        className="rounded bg-ai/15 px-0.5 text-ai"
-      >
-        {text.slice(e.start, e.end)}
-      </span>,
+  }
+  if (passageHighlight) {
+    const { start, end } = passageHighlight;
+    if (start >= 0 && end <= text.length && start < end) {
+      boundaries.add(start);
+      boundaries.add(end);
+    }
+  }
+
+  const points = [...boundaries].sort((a, b) => a - b);
+  const nodes: ReactNode[] = [];
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const segStart = points[i];
+    const segEnd = points[i + 1];
+    if (segStart >= segEnd) continue;
+
+    const inPassage =
+      passageHighlight &&
+      segStart >= passageHighlight.start &&
+      segEnd <= passageHighlight.end;
+    const entity = entities.find(
+      (e) => segStart >= e.start && segEnd <= e.end,
     );
-    cursor = e.end;
-  });
-  if (cursor < text.length) {
-    nodes.push(<span key="tail">{text.slice(cursor)}</span>);
+
+    let kind: SegmentKind = "plain";
+    if (inPassage) kind = "passage";
+    else if (entity) kind = "entity";
+
+    const slice = text.slice(segStart, segEnd);
+    if (!slice) continue;
+
+    if (kind === "passage") {
+      const isFirstPassageSegment = segStart === passageHighlight!.start;
+      nodes.push(
+        <span
+          key={`p-${segStart}`}
+          ref={isFirstPassageSegment ? passageHighlightRef : undefined}
+          className="rounded bg-warning/20 px-0.5 ring-1 ring-warning/30"
+        >
+          {slice}
+        </span>,
+      );
+    } else if (kind === "entity" && entity) {
+      nodes.push(
+        <span
+          key={`e-${segStart}`}
+          title={`${entity.label} · ${(entity.confidence * 100).toFixed(1)}%`}
+          className="rounded bg-ai/15 px-0.5 text-ai"
+        >
+          {slice}
+        </span>,
+      );
+    } else {
+      nodes.push(<span key={`t-${segStart}`}>{slice}</span>);
+    }
   }
 
   return (
@@ -176,17 +210,28 @@ function ExtractedTextPanel({
   text,
   entities,
   analyzing,
+  passageHighlight,
 }: {
   text: string;
   entities: DocumentEntity[];
   analyzing: boolean;
+  passageHighlight?: { start: number; end: number } | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const passageHighlightRef = useRef<HTMLSpanElement>(null);
   const [selectionAnchor, setSelectionAnchor] = useState<{
     text: string;
     top: number;
     left: number;
   } | null>(null);
+
+  useEffect(() => {
+    if (!passageHighlight) return;
+    passageHighlightRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [passageHighlight]);
 
   const updateSelectionAnchor = () => {
     const sel = window.getSelection();
@@ -257,7 +302,12 @@ function ExtractedTextPanel({
           Analyzing document…
         </div>
       ) : (
-        <HighlightedText text={text} entities={entities} />
+        <HighlightedText
+          text={text}
+          entities={entities}
+          passageHighlight={passageHighlight}
+          passageHighlightRef={passageHighlightRef}
+        />
       )}
     </div>
   );
@@ -347,6 +397,10 @@ export default function DocumentStudio() {
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [qaHistory, setQaHistory] = useState<QaEntry[]>([]);
+  const [passageHighlight, setPassageHighlight] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
   const [status, setStatus] = useState<DocumentStatus>("new");
   const inputRef = useRef<HTMLInputElement>(null);
   const search = useSearch();
@@ -388,7 +442,12 @@ export default function DocumentStudio() {
           chunk_count: 0,
           model_used: stored.modelUsed ?? null,
         });
-        setQaHistory(stored.qaHistory);
+        setQaHistory(
+          stored.qaHistory.map((entry) => ({
+            question: entry.question,
+            sources: entry.sources ?? [],
+          })),
+        );
         setStatus(stored.status ?? "new");
       })
       .catch(() => {
@@ -409,6 +468,7 @@ export default function DocumentStudio() {
     setQuestion("");
     setAsking(false);
     setQaHistory([]);
+    setPassageHighlight(null);
     setStatus("new");
   };
 
@@ -443,36 +503,41 @@ export default function DocumentStudio() {
     setAsking(true);
     setError(null);
     try {
-      const result = await askDocument(uploadedDoc.full_text, q);
+      const result = await askDocument(
+        uploadedDoc.full_text,
+        q,
+        3,
+        uploadedDoc.document_id,
+      );
       const newEntry: QaEntry = {
         question: q,
-        answer: result.answer,
         sources: result.sources,
       };
-      setQaHistory((prev) => [...prev, newEntry]);
+      const nextHistory = [...qaHistory, newEntry];
+      setQaHistory(nextHistory);
       setQuestion("");
       const nextStatus: DocumentStatus =
         status === "reviewed" ? "reviewed" : "in_progress";
       setStatus(nextStatus);
-      if (uploadedDoc) {
-        await saveDocument({
-          id: uploadedDoc.document_id,
-          filename: uploadedDoc.filename,
-          full_text: uploadedDoc.full_text,
+      await updateDocument(uploadedDoc.document_id, {
+        status: nextStatus,
+        metadata: {
           page_count: uploadedDoc.page_count,
-          status: nextStatus,
           entities: analysisResult?.entities || [],
-          modelUsed: analysisResult?.model_used ?? undefined,
-          qaHistory: [...qaHistory, newEntry],
-          uploadedAt: Date.now(),
-          lastAccessedAt: Date.now(),
-        });
-      }
+          model_used: analysisResult?.model_used ?? undefined,
+          qa_history: nextHistory,
+          last_accessed_at: Date.now(),
+        },
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Question failed");
     } finally {
       setAsking(false);
     }
+  };
+
+  const handlePassageClick = (source: DocumentSource) => {
+    setPassageHighlight({ start: source.start, end: source.end });
   };
 
   const handleFile = async (file: File) => {
@@ -813,6 +878,7 @@ export default function DocumentStudio() {
                       text={analysisResult?.text ?? uploadedDoc.full_text}
                       entities={analysisResult?.entities ?? []}
                       analyzing={analyzing}
+                      passageHighlight={passageHighlight}
                     />
                   </CardContent>
                 </Card>
@@ -848,8 +914,8 @@ export default function DocumentStudio() {
 
                     {qaHistory.length === 0 ? (
                       <p className="mt-3 text-sm text-muted-foreground">
-                        Ask a question about this document — try "What medications
-                        are mentioned?" or "What is the diagnosis?"
+                        Ask a question to find relevant passages in this
+                        document — answers are not generated yet.
                       </p>
                     ) : (
                       <div className="mt-3 space-y-4">
@@ -861,8 +927,11 @@ export default function DocumentStudio() {
                               </div>
                             </div>
                             <div className="flex justify-start">
-                              <div className="max-w-[85%]">
-                                <AnswerBubble entry={entry} />
+                              <div className="max-w-[85%] w-full">
+                                <QaPassageResults
+                                  entry={entry}
+                                  onPassageClick={handlePassageClick}
+                                />
                               </div>
                             </div>
                           </div>

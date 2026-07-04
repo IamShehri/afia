@@ -247,19 +247,97 @@ def split_sentences(text: str) -> list[str]:
     sentences = re.split(r'(?<=[.!?])\s+', text)
     return [s.strip() for s in sentences if len(s.strip()) > 10]
 
-def score_sentence(sentence: str, question_words: set) -> float:
-    sentence_words = set(re.findall(r'\b\w+\b', sentence.lower()))
-    overlap = len(question_words & sentence_words)
-    if overlap == 0:
-        return 0.0
-    return overlap / (len(question_words) + 0.001)
 
-STOP_WORDS = {
-    "what", "is", "are", "the", "a", "an", "of", "in", "on",
-    "for", "to", "and", "or", "does", "do", "did", "was",
-    "were", "how", "why", "who", "when", "where", "which",
-    "this", "that", "with", "has", "have", "had"
-}
+def collect_sentence_spans(text: str) -> list[dict]:
+    """Map split_sentences() back to document character offsets."""
+    spans: list[dict] = []
+    offset = 0
+    for sent in split_sentences(text):
+        idx = text.find(sent, offset)
+        if idx == -1:
+            idx = offset
+        spans.append(
+            {
+                "text": sent,
+                "char_start": idx,
+                "char_end": idx + len(sent),
+            }
+        )
+        offset = idx + len(sent)
+    return spans
+
+
+# --- Extractive retrieval (Talk to Document v1) ------------------------------
+
+RETRIEVAL_MODEL = "all-MiniLM-L6-v2"
+_embedder = None
+_embedder_load_error: Optional[str] = None
+
+
+def _get_embedder():
+    global _embedder, _embedder_load_error
+    if _embedder is not None:
+        return _embedder
+    if _embedder_load_error is not None:
+        raise HTTPException(status_code=500, detail=_embedder_load_error)
+    try:
+        from sentence_transformers import SentenceTransformer
+
+        _embedder = SentenceTransformer(RETRIEVAL_MODEL)
+    except Exception as exc:
+        _embedder_load_error = (
+            f"Failed to load retrieval model {RETRIEVAL_MODEL}: {exc}"
+        )
+        raise HTTPException(status_code=500, detail=_embedder_load_error) from exc
+    return _embedder
+
+
+def _retrieve_passages(text: str, question: str, top_k: int) -> list[dict]:
+    spans = collect_sentence_spans(text)
+    if not spans:
+        raise HTTPException(
+            status_code=500,
+            detail="Document text has no processable sentence chunks for retrieval",
+        )
+
+    embedder = _get_embedder()
+    try:
+        from sentence_transformers import util
+
+        chunk_texts = [s["text"] for s in spans]
+        embeddings = embedder.encode(
+            chunk_texts + [question],
+            convert_to_tensor=True,
+            show_progress_bar=False,
+        )
+        chunk_embeddings = embeddings[:-1]
+        question_embedding = embeddings[-1:]
+        scores = util.cos_sim(question_embedding, chunk_embeddings)[0]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Passage retrieval failed: {exc}",
+        ) from exc
+
+    ranked = sorted(
+        zip(spans, scores.tolist()),
+        key=lambda item: item[1],
+        reverse=True,
+    )[: max(1, top_k)]
+
+    passages = []
+    for span, score in ranked:
+        passages.append(
+            {
+                "text": span["text"],
+                "score": round(float(score), 4),
+                "char_start": span["char_start"],
+                "char_end": span["char_end"],
+            }
+        )
+    return passages
 
 @app.get("/health")
 def health():
@@ -465,6 +543,7 @@ def analyze_document(req: ChunkAnalyzeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 class AskDocumentRequest(BaseModel):
+    document_id: Optional[str] = None
     text: str
     question: str
     top_k: Optional[int] = 3
@@ -472,50 +551,24 @@ class AskDocumentRequest(BaseModel):
 @app.post("/ask-document")
 def ask_document(req: AskDocumentRequest):
     try:
-        sentences = split_sentences(req.text)
-        question_words = set(re.findall(r'\b\w+\b', req.question.lower()))
-        question_words = question_words - STOP_WORDS
-        
-        if not question_words:
-            return {
-                "question": req.question,
-                "answer": "Please ask a more specific question.",
-                "sources": [],
-            }
-        
-        scored = []
-        offset = 0
-        for sent in sentences:
-            score = score_sentence(sent, question_words)
-            idx = req.text.find(sent, offset)
-            if idx == -1:
-                idx = offset
-            if score > 0:
-                scored.append({
-                    "text": sent,
-                    "score": round(score, 3),
-                    "start": idx,
-                    "end": idx + len(sent),
-                })
-            offset = idx + len(sent)
-        
-        scored.sort(key=lambda x: x["score"], reverse=True)
-        top_results = scored[:req.top_k]
-        
-        if not top_results:
-            return {
-                "question": req.question,
-                "answer": "I couldn't find relevant information in this document for that question.",
-                "sources": [],
-            }
-        
-        answer = " ".join([r["text"] for r in top_results[:2]])
-        
+        text = req.text.strip()
+        question = req.question.strip()
+        top_k = req.top_k or 3
+
+        if not text:
+            raise HTTPException(status_code=400, detail="Document text is required")
+        if not question:
+            raise HTTPException(status_code=400, detail="Question is required")
+
+        passages = _retrieve_passages(text, question, top_k)
+
         return {
-            "question": req.question,
-            "answer": answer,
-            "sources": top_results,
+            "question": question,
+            "passages": passages,
+            "retrieval_model": RETRIEVAL_MODEL,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
