@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import Optional
 import asyncio
 import json
-import openmed
+import os
 import uvicorn
 import fitz  # PyMuPDF
 import hashlib
@@ -17,6 +17,30 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib import error as urlerror
 from urllib import request as urlrequest
+
+# DeBERTa-v2 NER models fail when transformers loads with SDPA
+# (scaled_dot_product_attention). openmed 1.7.0 defaults to "auto", which picks
+# sdpa whenever torch exposes it — including on Windows CPU. A bare terminal
+# openmed.analyze_text() call uses the same API but often succeeds because torch
+# builds differ; the bridge must force eager so loads match known-good behavior.
+# OpenMedConfig also reads this env var for extract_pii and other pipelines.
+os.environ.setdefault("OPENMED_TORCH_ATTENTION_BACKEND", "eager")
+
+import openmed
+
+# analyze_text(**pipeline_kwargs) forwards to ModelLoader.create_pipeline, which
+# threads model_kwargs into from_pretrained(attn_implementation=...).
+_OPENMED_PIPELINE_KWARGS = {"model_kwargs": {"attn_implementation": "eager"}}
+
+
+def _analyze_text(text: str, model: Optional[str] = None):
+    if model:
+        return openmed.analyze_text(
+            text,
+            model_name=model,
+            **_OPENMED_PIPELINE_KWARGS,
+        )
+    return openmed.analyze_text(text, **_OPENMED_PIPELINE_KWARGS)
 
 app = FastAPI(title="AFIA OpenMed Bridge", version="1.0.0")
 
@@ -151,6 +175,37 @@ def _is_model_unavailable_error(exc: Exception) -> bool:
     )
 
 
+def _model_unavailable_response(model_id: str) -> JSONResponse:
+    mark_model_unavailable(model_id)
+    return JSONResponse(
+        status_code=422,
+        content={"error": "model_unavailable", "model": model_id},
+    )
+
+
+def _require_analysis_model_name(result, expected_model: Optional[str] = None) -> str:
+    """Ensure inference ran under an identifiable model — never silent empty success."""
+    if result is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Analysis returned no result (model may have failed to load)",
+        )
+    model_name = getattr(result, "model_name", None)
+    if not model_name:
+        raise HTTPException(
+            status_code=500,
+            detail="Analysis completed without a model identity (pipeline may have failed silently)",
+        )
+    if expected_model and model_name != expected_model:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Requested model {expected_model} but inference ran with {model_name}"
+            ),
+        )
+    return model_name
+
+
 def _group_openmed_models(model_ids: list[str]) -> dict:
     grouped = {
         "ner": [],
@@ -220,9 +275,9 @@ async def list_models():
 def analyze(req: AnalyzeRequest):
     try:
         if req.model:
-            result = openmed.analyze_text(req.text, model_name=req.model)
+            result = _analyze_text(req.text, req.model)
         else:
-            result = openmed.analyze_text(req.text)
+            result = _analyze_text(req.text)
         return {
             "text": result.text,
             "model": result.model_name,
@@ -346,38 +401,67 @@ class ChunkAnalyzeRequest(BaseModel):
 def analyze_document(req: ChunkAnalyzeRequest):
     try:
         text = req.text
-        chunk_size = req.chunk_size
+        chunk_size = req.chunk_size or 3000
         all_entities = []
+        model_used: Optional[str] = None
+        chunks_analyzed = 0
 
         for i in range(0, len(text), chunk_size):
-            chunk = text[i:i + chunk_size]
+            chunk = text[i : i + chunk_size]
             if not chunk.strip():
                 continue
+
             if req.model:
-                result = openmed.analyze_text(chunk, model_name=req.model)
+                result = _analyze_text(chunk, req.model)
             else:
-                result = openmed.analyze_text(chunk)
+                result = _analyze_text(chunk)
+
+            chunk_model = _require_analysis_model_name(result, req.model)
+            if model_used is None:
+                model_used = chunk_model
+            elif model_used != chunk_model:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Inconsistent model across chunks: {model_used} vs {chunk_model}",
+                )
+
+            chunks_analyzed += 1
             for e in result.entities:
-                all_entities.append({
-                    "text": e.text,
-                    "label": e.label,
-                    "confidence": e.confidence,
-                    "start": e.start + i,
-                    "end": e.end + i,
-                })
+                all_entities.append(
+                    {
+                        "text": e.text,
+                        "label": e.label,
+                        "confidence": e.confidence,
+                        "start": e.start + i,
+                        "end": e.end + i,
+                    }
+                )
+
+        if text.strip() and chunks_analyzed == 0:
+            raise HTTPException(
+                status_code=500,
+                detail="Document text could not be analyzed (no processable chunks)",
+            )
+
+        if text.strip() and not model_used:
+            raise HTTPException(
+                status_code=500,
+                detail="Analysis completed without a model identity",
+            )
 
         return {
             "text": text,
             "entities": all_entities,
-            "chunk_count": (len(text) // chunk_size) + 1,
+            "chunk_count": max(1, (len(text) + chunk_size - 1) // chunk_size)
+            if text
+            else 0,
+            "model_used": model_used,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         if req.model and _is_model_unavailable_error(e):
-            mark_model_unavailable(req.model)
-            return JSONResponse(
-                status_code=422,
-                content={"error": "model_unavailable", "model": req.model},
-            )
+            return _model_unavailable_response(req.model)
         raise HTTPException(status_code=500, detail=str(e))
 
 class AskDocumentRequest(BaseModel):

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import {
 } from "@/services/openmed-client";
 import {
   getActiveModel,
+  invalidateDefaultAnalysisModel,
   setActiveModel,
 } from "@/services/model-preference";
 import {
@@ -18,7 +19,7 @@ import {
   isMlxModel,
   isModelCompatibleOnPlatform,
 } from "@/lib/model-platform";
-import { Sparkles, Search, AlertCircle, X, Check, Loader2 } from "lucide-react";
+import { Sparkles, Search, AlertCircle, X, Check, Loader2, RefreshCw } from "lucide-react";
 
 type Category = "ner" | "pii" | "zeroshot" | "other";
 
@@ -147,28 +148,25 @@ export default function Models() {
     setActiveModelState(getActiveModel());
   }, []);
 
-  useEffect(() => {
-    let active = true;
+  const loadModels = useCallback(async (refresh = false) => {
     setLoading(true);
-    getModels()
-      .then((data) => {
-        if (active) {
-          setModels(data);
-          setError(null);
-        }
-      })
-      .catch((e) => {
-        if (active) {
-          setError(e instanceof Error ? e.message : "Failed to fetch models");
-        }
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
+    setError(null);
+    try {
+      if (refresh) {
+        invalidateDefaultAnalysisModel();
+      }
+      const data = await getModels(refresh ? { refresh: true } : undefined);
+      setModels(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to fetch models");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadModels(false);
+  }, [loadModels]);
 
   const counts = useMemo<Record<Category, number>>(
     () => ({
@@ -221,10 +219,26 @@ export default function Models() {
   return (
     <div className="h-full overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-        <PageHeader
-          title="Model Library"
-          subtitle="Browse and select OpenMed models for your analysis"
-        />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <PageHeader
+            title="Model Library"
+            subtitle="Browse and select OpenMed models for your analysis"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={loading}
+            onClick={() => void loadModels(true)}
+            className="shrink-0"
+          >
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+            Refresh catalog
+          </Button>
+        </div>
 
         {onNonMac && (
           <div className="flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/10 p-3 text-sm">

@@ -18,6 +18,7 @@ import {
 import {
   saveDocument,
   getDocument,
+  updateDocument,
   updateDocumentStatus,
   type StoredDocument,
   type DocumentStatus,
@@ -25,6 +26,7 @@ import {
 import { logAction } from "@/lib/audit";
 import { resolveAnalysisModel } from "@/services/model-preference";
 import { ShareMenu } from "@/components/ShareMenu";
+import { ExternalSearchMenu } from "@/components/ExternalSearchMenu";
 import { APP_PUBLIC_URL } from "@/const";
 import { buildDocumentShareText } from "@/lib/social-share";
 import {
@@ -40,6 +42,8 @@ import {
   Layers,
   TrendingUp,
   Download,
+  BookOpen,
+  RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 
@@ -64,6 +68,10 @@ function entitiesToCSV(entities: DocumentEntity[]): string {
     })
     .join("\n");
   return header + rows;
+}
+
+function cleanModelLabel(modelId: string): string {
+  return modelId.replace(/^OpenMed\//i, "").replace(/^.*\//, "");
 }
 
 interface QaEntry {
@@ -161,6 +169,97 @@ function HighlightedText({
     <p className="font-mono text-xs leading-relaxed whitespace-pre-wrap">
       {nodes}
     </p>
+  );
+}
+
+function ExtractedTextPanel({
+  text,
+  entities,
+  analyzing,
+}: {
+  text: string;
+  entities: DocumentEntity[];
+  analyzing: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [selectionAnchor, setSelectionAnchor] = useState<{
+    text: string;
+    top: number;
+    left: number;
+  } | null>(null);
+
+  const updateSelectionAnchor = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !containerRef.current) {
+      setSelectionAnchor(null);
+      return;
+    }
+
+    const selectedText = sel.toString().trim();
+    const anchorNode = sel.anchorNode;
+    if (
+      !selectedText ||
+      !anchorNode ||
+      !containerRef.current.contains(anchorNode)
+    ) {
+      setSelectionAnchor(null);
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    const containerRect = containerRef.current.getBoundingClientRect();
+    setSelectionAnchor({
+      text: selectedText,
+      top:
+        rect.top - containerRect.top + containerRef.current.scrollTop - 32,
+      left: Math.max(
+        0,
+        rect.left - containerRect.left + containerRef.current.scrollLeft,
+      ),
+    });
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative mt-2 max-h-[calc(100vh-20rem)] overflow-auto rounded-md border border-hairline bg-surface p-4"
+      onMouseUp={updateSelectionAnchor}
+      onKeyUp={updateSelectionAnchor}
+    >
+      {selectionAnchor && (
+        <div
+          className="absolute z-10"
+          style={{
+            top: selectionAnchor.top,
+            left: selectionAnchor.left,
+          }}
+        >
+          <ExternalSearchMenu
+            query={selectionAnchor.text}
+            align="start"
+            trigger={
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-7 text-xs shadow-md"
+              >
+                <BookOpen className="size-3.5" />
+                Search literature
+              </Button>
+            }
+          />
+        </div>
+      )}
+      {analyzing ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Analyzing document…
+        </div>
+      ) : (
+        <HighlightedText text={text} entities={entities} />
+      )}
+    </div>
   );
 }
 
@@ -287,6 +386,7 @@ export default function DocumentStudio() {
           text: stored.full_text,
           entities: stored.entities,
           chunk_count: 0,
+          model_used: stored.modelUsed ?? null,
         });
         setQaHistory(stored.qaHistory);
         setStatus(stored.status ?? "new");
@@ -362,6 +462,7 @@ export default function DocumentStudio() {
           page_count: uploadedDoc.page_count,
           status: nextStatus,
           entities: analysisResult?.entities || [],
+          modelUsed: analysisResult?.model_used ?? undefined,
           qaHistory: [...qaHistory, newEntry],
           uploadedAt: Date.now(),
           lastAccessedAt: Date.now(),
@@ -414,6 +515,7 @@ export default function DocumentStudio() {
           page_count: doc.page_count,
           status: "new",
           entities: result.entities,
+          modelUsed: result.model_used ?? undefined,
           qaHistory: [],
           uploadedAt: Date.now(),
           lastAccessedAt: Date.now(),
@@ -433,6 +535,33 @@ export default function DocumentStudio() {
     setDragActive(false);
     const file = ev.dataTransfer.files?.[0];
     if (file) void handleFile(file);
+  };
+
+  const handleReanalyze = async () => {
+    if (!uploadedDoc || analyzing) return;
+    setError(null);
+    setAnalyzing(true);
+    try {
+      const result = await analyzeDocument(
+        uploadedDoc.full_text,
+        3000,
+        await resolveAnalysisModel(),
+      );
+      setAnalysisResult(result);
+      await updateDocument(uploadedDoc.document_id, {
+        metadata: {
+          page_count: uploadedDoc.page_count,
+          entities: result.entities,
+          model_used: result.model_used ?? undefined,
+          qa_history: qaHistory,
+          last_accessed_at: Date.now(),
+        },
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Re-analysis failed");
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const entities = analysisResult?.entities ?? [];
@@ -581,27 +710,37 @@ export default function DocumentStudio() {
             </div>
 
             {/* Row 1 — Stat cards */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <StatCard
-                label="Pages"
-                value={uploadedDoc.page_count}
-                icon={FileText}
-              />
-              <StatCard
-                label="Entities Found"
-                value={entityCount}
-                icon={Tags}
-              />
-              <StatCard
-                label="Entity Types"
-                value={uniqueLabelCount}
-                icon={Layers}
-              />
-              <StatCard
-                label="Avg Confidence"
-                value={`${(avgConfidence * 100).toFixed(0)}%`}
-                icon={TrendingUp}
-              />
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <StatCard
+                  label="Pages"
+                  value={uploadedDoc.page_count}
+                  icon={FileText}
+                />
+                <StatCard
+                  label="Entities Found"
+                  value={entityCount}
+                  icon={Tags}
+                />
+                <StatCard
+                  label="Entity Types"
+                  value={uniqueLabelCount}
+                  icon={Layers}
+                />
+                <StatCard
+                  label="Avg Confidence"
+                  value={`${(avgConfidence * 100).toFixed(0)}%`}
+                  icon={TrendingUp}
+                />
+              </div>
+              {analysisResult?.model_used && !analyzing && (
+                <p className="text-xs text-muted-foreground">
+                  Analyzed with:{" "}
+                  <span className="font-mono text-foreground/80">
+                    {cleanModelLabel(analysisResult.model_used)}
+                  </span>
+                </p>
+              )}
             </div>
 
             {/* Row 2 — Two columns */}
@@ -618,9 +757,27 @@ export default function DocumentStudio() {
                           Analyzing document…
                         </div>
                       ) : groupedEntities.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          No entities detected.
-                        </p>
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">
+                            No entities detected.
+                          </p>
+                          {analysisResult && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-auto px-0 py-0 text-xs text-muted-foreground hover:text-foreground"
+                              disabled={analyzing}
+                              onClick={() => void handleReanalyze()}
+                            >
+                              {analyzing ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : (
+                                <RefreshCw className="size-3.5" />
+                              )}
+                              Re-analyze with current model
+                            </Button>
+                          )}
+                        </div>
                       ) : (
                         groupedEntities.map(([label, list]) => (
                           <div key={label}>
@@ -652,19 +809,11 @@ export default function DocumentStudio() {
                 <Card>
                   <CardContent>
                     <SectionLabel>Extracted Text</SectionLabel>
-                    <div className="mt-2 max-h-[calc(100vh-20rem)] overflow-auto rounded-md border border-hairline bg-surface p-4">
-                      {analyzing ? (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Loader2 className="size-4 animate-spin" />
-                          Analyzing document…
-                        </div>
-                      ) : (
-                        <HighlightedText
-                          text={analysisResult?.text ?? uploadedDoc.full_text}
-                          entities={analysisResult?.entities ?? []}
-                        />
-                      )}
-                    </div>
+                    <ExtractedTextPanel
+                      text={analysisResult?.text ?? uploadedDoc.full_text}
+                      entities={analysisResult?.entities ?? []}
+                      analyzing={analyzing}
+                    />
                   </CardContent>
                 </Card>
 

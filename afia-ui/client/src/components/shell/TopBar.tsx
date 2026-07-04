@@ -1,9 +1,11 @@
+import { useRef, useState } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/primitives";
 import { Monogram } from "@/components/primitives";
+import { ExternalSearchMenu } from "@/components/ExternalSearchMenu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +21,8 @@ export function TopBar() {
   const { theme, toggleTheme } = useTheme();
   const { user, signOut } = useAuth();
   const [, setLocation] = useLocation();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const displayName = user?.email?.split("@")[0] ?? "User";
   const displayEmail = user?.email ?? "Signed in";
@@ -30,16 +34,32 @@ export function TopBar() {
 
   return (
     <div className="flex h-12 items-center justify-between gap-4 border-b border-hairline bg-background px-4">
-      {/* Left: search trigger */}
-      <button
-        onClick={() => setPaletteOpen(true)}
-        className="flex h-8 flex-1 max-w-sm items-center gap-2 rounded-md border border-hairline bg-surface px-3 text-sm text-muted-foreground transition-colors hover:bg-surface hover:border-hairline-strong press"
-      >
-        <Search className="size-4 opacity-60" />
-        <span className="hidden sm:inline">Search patients, actions…</span>
-        <span className="sm:hidden">Search…</span>
-        <Kbd className="ml-auto">⌘K</Kbd>
-      </button>
+      {/* Left: search input + external literature */}
+      <div className="flex h-8 flex-1 max-w-sm items-center rounded-md border border-hairline bg-surface transition-colors hover:border-hairline-strong">
+        <button
+          type="button"
+          onClick={() => setPaletteOpen(true)}
+          className="flex shrink-0 items-center pl-3 press"
+          aria-label="Open command palette"
+          title="Open command palette (⌘K)"
+        >
+          <Search className="size-4 opacity-60" />
+        </button>
+        <input
+          ref={searchInputRef}
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search patients, actions…"
+          aria-label="Search"
+          className="min-w-0 flex-1 bg-transparent px-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+        />
+        <ExternalSearchMenu
+          query={searchQuery}
+          onEmptyQuery={() => searchInputRef.current?.focus()}
+        />
+        <Kbd className="mr-2 hidden shrink-0 sm:inline">⌘K</Kbd>
+      </div>
 
       {/* Right: theme + user menu */}
       <div className="flex items-center gap-1">

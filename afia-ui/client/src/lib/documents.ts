@@ -20,6 +20,7 @@ export interface DocumentMetadata {
   page_count?: number;
   entities?: DocumentEntity[];
   qa_history?: DocumentQaEntry[];
+  model_used?: string;
   uploaded_at?: number;
   last_accessed_at?: number;
 }
@@ -34,6 +35,7 @@ export interface StoredDocument {
   status: DocumentStatus;
   entities: DocumentEntity[];
   qaHistory: DocumentQaEntry[];
+  modelUsed?: string;
   uploadedAt: number;
   lastAccessedAt: number;
 }
@@ -79,6 +81,7 @@ function cryptoDocToStored(doc: CryptoDocument): StoredDocument {
     status: parseStatus(doc.status),
     entities: meta.entities ?? [],
     qaHistory: meta.qa_history ?? [],
+    modelUsed: meta.model_used,
     uploadedAt:
       meta.uploaded_at ?? new Date(doc.created_at).getTime(),
     lastAccessedAt:
@@ -195,6 +198,7 @@ export async function saveDocument(
       page_count: doc.page_count,
       entities: doc.entities,
       qa_history: doc.qaHistory,
+      model_used: doc.modelUsed,
       uploaded_at: doc.uploadedAt,
       last_accessed_at: doc.lastAccessedAt,
     },

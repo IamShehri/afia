@@ -38,9 +38,7 @@ export async function checkHealth(): Promise<boolean> {
 }
 
 export async function listModels(): Promise<ModelGroup> {
-  const res = await fetch(`${BASE_URL}/models`);
-  if (!res.ok) throw new Error("Failed to fetch models");
-  return res.json();
+  return getModels();
 }
 
 export async function analyzeText(text: string, model?: string): Promise<AnalyzeResult> {
@@ -108,6 +106,7 @@ export interface DocumentAnalysisResult {
   text: string;
   entities: DocumentEntity[];
   chunk_count: number;
+  model_used?: string | null;
 }
 
 export async function uploadPDF(file: File): Promise<UploadedDocument> {
@@ -131,7 +130,24 @@ export async function analyzeDocument(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, chunk_size: chunkSize, model }),
   });
-  if (!res.ok) throw new Error("Document analysis failed");
+  if (!res.ok) {
+    let message = "Document analysis failed";
+    try {
+      const body = (await res.json()) as {
+        error?: string;
+        model?: string;
+        detail?: string;
+      };
+      if (body.error === "model_unavailable" && body.model) {
+        message = `Model unavailable: ${body.model}`;
+      } else if (typeof body.detail === "string" && body.detail.length > 0) {
+        message = body.detail;
+      }
+    } catch {
+      /* use default message */
+    }
+    throw new Error(message);
+  }
   return res.json();
 }
 
@@ -167,13 +183,47 @@ export interface ModelInfo {
   name: string;
 }
 
-export async function getModels(): Promise<{
+export interface ModelsCatalog {
   ner: ModelInfo[];
   pii: ModelInfo[];
   zeroshot: ModelInfo[];
   other: ModelInfo[];
-}> {
+}
+
+let modelsCatalogCache: ModelsCatalog | null = null;
+let modelsCatalogPromise: Promise<ModelsCatalog> | null = null;
+
+async function fetchModelsFromBridge(): Promise<ModelsCatalog> {
   const res = await fetch(`${BASE_URL}/models`);
   if (!res.ok) throw new Error("Failed to fetch models");
   return res.json();
+}
+
+/** Drop session cache so the next getModels() hits the bridge again. */
+export function invalidateModelsCatalog(): void {
+  modelsCatalogCache = null;
+  modelsCatalogPromise = null;
+}
+
+export async function getModels(options?: {
+  refresh?: boolean;
+}): Promise<ModelsCatalog> {
+  if (options?.refresh) {
+    invalidateModelsCatalog();
+  }
+  if (modelsCatalogCache) {
+    return modelsCatalogCache;
+  }
+  if (!modelsCatalogPromise) {
+    modelsCatalogPromise = fetchModelsFromBridge()
+      .then((data) => {
+        modelsCatalogCache = data;
+        return data;
+      })
+      .catch((err) => {
+        modelsCatalogPromise = null;
+        throw err;
+      });
+  }
+  return modelsCatalogPromise;
 }

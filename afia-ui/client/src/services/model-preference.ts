@@ -7,7 +7,6 @@ import {
 const STORAGE_KEY = "afia_active_model";
 
 let cachedDefaultModel: string | null = null;
-let defaultFetchPromise: Promise<string | null> | null = null;
 
 export function getActiveModel(): string | null {
   try {
@@ -38,24 +37,24 @@ export function setActiveModel(modelId: string | null): void {
   }
 }
 
-async function fetchDefaultAnalysisModel(): Promise<string | null> {
-  if (cachedDefaultModel) return cachedDefaultModel;
-  if (defaultFetchPromise) return defaultFetchPromise;
-
-  defaultFetchPromise = getModels()
-    .then((data) => {
-      cachedDefaultModel = pickDefaultNerModelId(data.ner);
-      return cachedDefaultModel;
-    })
-    .catch(() => null)
-    .finally(() => {
-      defaultFetchPromise = null;
-    });
-
-  return defaultFetchPromise;
+/** Cleared when the model catalog is explicitly refreshed. */
+export function invalidateDefaultAnalysisModel(): void {
+  cachedDefaultModel = null;
 }
 
-/** Warm the default-model cache after the bridge is reachable. */
+async function fetchDefaultAnalysisModel(): Promise<string | null> {
+  if (cachedDefaultModel) return cachedDefaultModel;
+
+  try {
+    const data = await getModels();
+    cachedDefaultModel = pickDefaultNerModelId(data.ner);
+    return cachedDefaultModel;
+  } catch {
+    return null;
+  }
+}
+
+/** Warm the shared models catalog + default-model pick after login. */
 export function preloadDefaultAnalysisModel(): void {
   void fetchDefaultAnalysisModel();
 }
