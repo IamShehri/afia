@@ -13,6 +13,9 @@ import { patients } from "@/data/patients";
 import type { Patient } from "@/data/types";
 import { listDocuments, type StoredDocument } from "@/lib/documents";
 import { useLocation } from "wouter";
+import { ShareMenu } from "@/components/ShareMenu";
+import { APP_PUBLIC_URL } from "@/const";
+import { HOME_SHARE_TEXT } from "@/lib/social-share";
 import {
   FileText,
   MessageSquare,
@@ -107,14 +110,17 @@ export default function Home() {
     <div className="h-full overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-8">
         {/* Header */}
-        <PageHeader
-          title="Welcome back"
-          subtitle={new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        />
+        <div className="flex items-start justify-between gap-4">
+          <PageHeader
+            title="Welcome back"
+            subtitle={new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          />
+          <ShareMenu text={HOME_SHARE_TEXT} url={APP_PUBLIC_URL} />
+        </div>
 
         {/* SECTION 1 — Quick Actions */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

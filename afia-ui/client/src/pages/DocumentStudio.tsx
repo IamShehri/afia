@@ -24,6 +24,9 @@ import {
 } from "@/lib/documents";
 import { logAction } from "@/lib/audit";
 import { resolveAnalysisModel } from "@/services/model-preference";
+import { ShareMenu } from "@/components/ShareMenu";
+import { APP_PUBLIC_URL } from "@/const";
+import { buildDocumentShareText } from "@/lib/social-share";
 import {
   FileText,
   Upload,
@@ -561,6 +564,13 @@ export default function DocumentStudio() {
                       <Download className="size-4" />
                       Export JSON
                     </Button>
+                    <ShareMenu
+                      text={buildDocumentShareText(
+                        entityCount,
+                        uploadedDoc.page_count,
+                      )}
+                      url={APP_PUBLIC_URL}
+                    />
                   </>
                 )}
                 <Button variant="outline" size="sm" onClick={reset}>
