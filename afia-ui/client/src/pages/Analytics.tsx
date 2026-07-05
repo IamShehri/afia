@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +12,9 @@ import { CooccurrenceMatrixPanel } from "@/components/analytics/CooccurrenceMatr
 import { EntityStatisticsTable } from "@/components/analytics/EntityStatisticsTable";
 import { logAction } from "@/lib/audit";
 import { loadLibrarySummaries } from "@/lib/analytics-loader";
+import { ShareMenu } from "@/components/ShareMenu";
+import { APP_PUBLIC_URL } from "@/const";
+import { buildAnalyticsShareText } from "@/lib/social-share";
 import {
   computeConfidenceByDocument,
   computeLibraryOverview,
@@ -19,6 +22,11 @@ import {
   LIBRARY_ANALYTICS_CAP,
   type AnalyzedDocSummary,
 } from "@/lib/analytics-library";
+import {
+  parseAnalyticsTab,
+  type AnalyticsTab,
+  analyticsHref,
+} from "@/data/nav";
 import {
   BarChart3,
   FileText,
@@ -60,7 +68,16 @@ function StatCard({
 
 export default function Analytics() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const auditedRef = useRef(false);
+  const activeTab = parseAnalyticsTab(search);
+
+  const setActiveTab = useCallback(
+    (tab: AnalyticsTab) => {
+      setLocation(analyticsHref(tab));
+    },
+    [setLocation],
+  );
 
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState({ loaded: 0, total: 0 });
@@ -129,6 +146,15 @@ export default function Analytics() {
 
   const showEmpty = !loading && analyzedDocs.length < 2;
 
+  const analyticsShareText = useMemo(
+    () =>
+      buildAnalyticsShareText(
+        overview.documentCount,
+        overview.totalEntities,
+      ),
+    [overview.documentCount, overview.totalEntities],
+  );
+
   return (
     <div className="flex h-full flex-col bg-background">
       <div className="border-b border-hairline px-6 py-4">
@@ -137,13 +163,20 @@ export default function Analytics() {
             title="Analytics Lab"
             subtitle="Cross-document intelligence and research workbench"
           />
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={loading}
-            onClick={() => void runLoad()}
-            className="shrink-0"
-          >
+          <div className="flex shrink-0 items-center gap-2">
+            {!showEmpty && analyzedDocs.length >= 2 && (
+              <ShareMenu
+                text={analyticsShareText}
+                url={APP_PUBLIC_URL}
+                emailSubject="AFIA Analytics summary"
+              />
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loading}
+              onClick={() => void runLoad()}
+            >
             {loading ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
@@ -151,6 +184,7 @@ export default function Analytics() {
             )}
             Refresh
           </Button>
+          </div>
         </div>
       </div>
 
@@ -214,7 +248,11 @@ export default function Analytics() {
               </CardContent>
             </Card>
           ) : analyzedDocs.length >= 2 ? (
-            <Tabs defaultValue="overview" className="space-y-6">
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) => setActiveTab(value as AnalyticsTab)}
+              className="space-y-6"
+            >
               <TabsList>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="graph">

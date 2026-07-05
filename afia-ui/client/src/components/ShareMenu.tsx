@@ -5,15 +5,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { shareOnLinkedIn, shareOnX } from "@/lib/social-share";
-import { Share2, Linkedin, Twitter } from "lucide-react";
+import { shareOnLinkedIn, shareOnX, shareViaEmail } from "@/lib/social-share";
+import { Share2, Linkedin, Twitter, Mail } from "lucide-react";
 
 export interface ShareMenuProps {
   text: string;
   url: string;
+  emailSubject?: string;
 }
 
-export function ShareMenu({ text, url }: ShareMenuProps) {
+export function ShareMenu({ text, url, emailSubject }: ShareMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -23,6 +24,13 @@ export function ShareMenu({ text, url }: ShareMenuProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          className="cursor-pointer"
+          onClick={() => shareViaEmail(text, url, emailSubject)}
+        >
+          <Mail className="size-4" />
+          Email summary
+        </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer"
           onClick={() => shareOnLinkedIn(url)}

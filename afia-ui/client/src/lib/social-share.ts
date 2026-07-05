@@ -11,6 +11,16 @@ export function shareOnX(text: string, url: string): void {
   window.open(shareUrl, "afia-share-x", POPUP_FEATURES);
 }
 
+/** Opens the user's mail client with counts-only summary text (no PHI). */
+export function shareViaEmail(
+  text: string,
+  url: string,
+  subject = "AFIA research summary",
+): void {
+  const body = `${text}\n\n${url}`;
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 /** Studio Home — product-only share copy (no user/clinical data). */
 export const HOME_SHARE_TEXT =
   "Exploring AFIA — the privacy-first AI workspace for allied health 🩺";
@@ -27,4 +37,16 @@ export function buildDocumentShareText(
   pageCount: number,
 ): string {
   return `Analyzed a clinical document with AFIA — ${entityCount} entities detected across ${pageCount} pages, fully local & private 🔐`;
+}
+
+/**
+ * Analytics Lab / Entity Graph share copy — library counts only.
+ *
+ * PRIVACY BOUNDARY: no entity names, no document titles.
+ */
+export function buildAnalyticsShareText(
+  documentCount: number,
+  totalEntities: number,
+): string {
+  return `Explored ${documentCount} documents · ${totalEntities.toLocaleString()} entities with AFIA Analytics 🔬`;
 }

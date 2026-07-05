@@ -30,6 +30,7 @@ import {
 import { logAction } from "@/lib/audit";
 import { resolveAnalysisModel } from "@/services/model-preference";
 import { ShareMenu } from "@/components/ShareMenu";
+import { AnalysisModelPicker } from "@/components/document-studio/AnalysisModelPicker";
 import { ExternalSearchMenu } from "@/components/ExternalSearchMenu";
 import { APP_PUBLIC_URL } from "@/const";
 import { buildDocumentShareText } from "@/lib/social-share";
@@ -687,11 +688,12 @@ export default function DocumentStudio() {
 
   return (
     <div className="h-full flex flex-col bg-background">
-      <div className="border-b border-hairline px-6 py-4">
+      <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-4">
         <PageHeader
           title="Document Studio"
           subtitle="Upload clinical PDFs and detect entities across the full document"
         />
+        {!uploadedDoc && <AnalysisModelPicker className="shrink-0" />}
       </div>
 
       <div className="flex-1 overflow-auto p-6">
@@ -779,6 +781,7 @@ export default function DocumentStudio() {
                       <option value="in_progress">In Progress</option>
                       <option value="reviewed">Reviewed</option>
                     </select>
+                    <AnalysisModelPicker />
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {uploadedDoc.page_count} pages ·{" "}

@@ -1,41 +1,102 @@
 import { useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/primitives";
-import { Monogram } from "@/components/primitives";
 import { ExternalSearchMenu } from "@/components/ExternalSearchMenu";
+import { AfiaWordmark } from "@/components/brand/AfiaMark";
+import {
+  studioNav,
+  labNav,
+  isNavItemActive,
+} from "@/data/nav";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Moon, Sun, LogOut, Settings } from "lucide-react";
-import { useLocation } from "wouter";
+import { Search, Moon, Sun, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+function NavMenuDropdown({
+  label,
+  items,
+  location,
+  onNavigate,
+}: {
+  label: string;
+  items: typeof studioNav;
+  location: string;
+  onNavigate: (href: string) => void;
+}) {
+  const isActive = items.some((item) => isNavItemActive(location, item.href));
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant={isActive ? "secondary" : "ghost"}
+          size="sm"
+          className={cn("gap-1 px-2.5 font-medium", isActive && "text-foreground")}
+        >
+          {label}
+          <ChevronDown className="size-3.5 opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-52">
+        {items.map((item) => (
+          <DropdownMenuItem
+            key={item.id}
+            onClick={() => onNavigate(item.href)}
+            className={cn(
+              "cursor-pointer gap-2",
+              isNavItemActive(location, item.href) && "bg-accent",
+            )}
+          >
+            <item.icon className="size-4 shrink-0 opacity-80" />
+            <span>{item.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function TopBar() {
   const { setPaletteOpen } = useWorkspace();
   const { theme, toggleTheme } = useTheme();
-  const { user, signOut } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const displayName = user?.email?.split("@")[0] ?? "User";
-  const displayEmail = user?.email ?? "Signed in";
-
-  const handleSignOut = async () => {
-    await signOut();
-    setLocation("/login");
-  };
-
   return (
-    <div className="flex h-12 items-center justify-between gap-4 border-b border-hairline bg-background px-4">
-      {/* Left: search input + external literature */}
-      <div className="flex h-8 flex-1 max-w-sm items-center rounded-md border border-hairline bg-surface transition-colors hover:border-hairline-strong">
+    <div className="flex h-12 items-center gap-3 border-b border-hairline bg-background px-4">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setLocation("/")}
+        className="shrink-0 gap-2 px-2"
+        aria-label="AFIA home"
+      >
+        <AfiaWordmark className="text-primary" />
+      </Button>
+
+      <NavMenuDropdown
+        label="Studio"
+        items={studioNav}
+        location={location}
+        onNavigate={setLocation}
+      />
+      <NavMenuDropdown
+        label="Lab"
+        items={labNav}
+        location={location}
+        onNavigate={setLocation}
+      />
+
+      <div className="flex h-8 min-w-0 flex-1 max-w-md items-center rounded-md border border-hairline bg-surface transition-colors hover:border-hairline-strong">
         <button
           type="button"
           onClick={() => setPaletteOpen(true)}
@@ -61,13 +122,12 @@ export function TopBar() {
         <Kbd className="mr-2 hidden shrink-0 sm:inline">⌘K</Kbd>
       </div>
 
-      {/* Right: theme + user menu */}
-      <div className="flex items-center gap-1">
+      <div className="ml-auto flex shrink-0 items-center gap-1">
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={() => toggleTheme?.()}
-          aria-label="Toggle theme"
+          aria-label="Toggle appearance"
           title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
         >
           {theme === "dark" ? (
@@ -76,48 +136,6 @@ export function TopBar() {
             <Moon className="size-4" />
           )}
         </Button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Open account menu"
-              className="rounded-full"
-            >
-              <Monogram name={displayName} hue={210} size={20} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <div className="flex items-center gap-3 px-3 py-2">
-              <Monogram name={displayName} hue={210} size={32} />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">
-                  {displayName}
-                </div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {displayEmail}
-                </div>
-              </div>
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => setLocation("/settings")}
-              className="cursor-pointer"
-            >
-              <Settings className="size-4" />
-              <span>Settings</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => void handleSignOut()}
-              className="cursor-pointer text-destructive"
-            >
-              <LogOut className="size-4" />
-              <span>Sign out</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </div>
   );

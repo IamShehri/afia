@@ -67,3 +67,8 @@ export function pickDefaultNerModelId(models: ModelLike[]): string | null {
 
   return compatible[0]?.id ?? null;
 }
+
+/** Display name without org prefix (e.g. OpenMed/). */
+export function shortModelName(modelId: string): string {
+  return modelId.replace(/^OpenMed\//i, "").replace(/^.*\//, "");
+}

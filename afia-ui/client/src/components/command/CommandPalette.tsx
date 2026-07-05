@@ -11,7 +11,13 @@ import {
 } from "@/components/ui/command";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { primaryNav, settingsNav } from "@/data/nav";
+import {
+  railNav,
+  studioNav,
+  labNav,
+  clinicalNav,
+  aiNav,
+} from "@/data/nav";
 import { patients } from "@/data/patients";
 import { Monogram, RiskBadge } from "@/components/primitives";
 import {
@@ -101,8 +107,36 @@ export function CommandPalette() {
 
         <CommandSeparator />
 
-        <CommandGroup heading="Navigate">
-          {primaryNav.map((n) => (
+        <CommandGroup heading="Studio">
+          {studioNav.map((n) => (
+            <CommandItem
+              key={n.id}
+              value={`studio ${n.label}`}
+              onSelect={() => run(() => setLocation(n.href))}
+            >
+              <n.icon />
+              <span className="flex-1">{n.label}</span>
+              <ArrowRight className="size-3.5 opacity-40" />
+            </CommandItem>
+          ))}
+        </CommandGroup>
+
+        <CommandGroup heading="Lab">
+          {labNav.map((n) => (
+            <CommandItem
+              key={n.id}
+              value={`lab ${n.label}`}
+              onSelect={() => run(() => setLocation(n.href))}
+            >
+              <n.icon />
+              <span className="flex-1">{n.label}</span>
+              <ArrowRight className="size-3.5 opacity-40" />
+            </CommandItem>
+          ))}
+        </CommandGroup>
+
+        <CommandGroup heading="Workspace">
+          {railNav.map((n) => (
             <CommandItem
               key={n.id}
               value={`go ${n.label}`}
@@ -113,13 +147,26 @@ export function CommandPalette() {
               <ArrowRight className="size-3.5 opacity-40" />
             </CommandItem>
           ))}
+        </CommandGroup>
+
+        <CommandGroup heading="Clinical">
+          {clinicalNav.map((n) => (
+            <CommandItem
+              key={n.id}
+              value={`clinical ${n.label}`}
+              onSelect={() => run(() => setLocation(n.href))}
+            >
+              <n.icon />
+              <span className="flex-1">{n.label}</span>
+              <ArrowRight className="size-3.5 opacity-40" />
+            </CommandItem>
+          ))}
           <CommandItem
-            value="go settings"
-            onSelect={() => run(() => setLocation(settingsNav.href))}
+            value="ask afia assistant ai"
+            onSelect={() => run(() => setLocation(aiNav.href))}
           >
-            <settingsNav.icon />
-            <span className="flex-1">Go to Settings</span>
-            <ArrowRight className="size-3.5 opacity-40" />
+            <aiNav.icon className="text-ai" />
+            <span className="flex-1">{aiNav.label}</span>
           </CommandItem>
         </CommandGroup>
 
@@ -127,11 +174,11 @@ export function CommandPalette() {
 
         <CommandGroup heading="Actions">
           <CommandItem
-            value="ask afia assistant ai"
+            value="ask afia assistant panel"
             onSelect={() => run(() => toggleAssistant())}
           >
             <Sparkles className="text-ai" />
-            <span className="flex-1">Ask AFIA Assistant</span>
+            <span className="flex-1">Open AFIA Assistant panel</span>
             <span className="font-mono text-[11px] text-muted-foreground">
               ⌘J
             </span>

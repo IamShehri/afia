@@ -19,7 +19,13 @@ import {
   downloadGraphJson,
   exportGraphPng,
 } from "@/components/analytics/EntityGraphCanvas";
-import type { AnalyzedDocSummary } from "@/lib/analytics-library";
+import {
+  computeLibraryOverview,
+  type AnalyzedDocSummary,
+} from "@/lib/analytics-library";
+import { ShareMenu } from "@/components/ShareMenu";
+import { APP_PUBLIC_URL } from "@/const";
+import { buildAnalyticsShareText } from "@/lib/social-share";
 import {
   buildEntityNodeMeta,
   buildGraphFromLibrary,
@@ -71,6 +77,14 @@ export function EntityGraphPanel({ analyzedDocs }: EntityGraphPanelProps) {
     () => buildEntityNodeMeta(analyzedDocs),
     [analyzedDocs],
   );
+
+  const shareText = useMemo(() => {
+    const overview = computeLibraryOverview(analyzedDocs);
+    return buildAnalyticsShareText(
+      overview.documentCount,
+      overview.totalEntities,
+    );
+  }, [analyzedDocs]);
 
   const labelTypes = useMemo(() => {
     const types = new Set<string>();
@@ -324,6 +338,11 @@ export function EntityGraphPanel({ analyzedDocs }: EntityGraphPanelProps) {
             <Image className="size-4" />
             PNG
           </Button>
+          <ShareMenu
+            text={shareText}
+            url={APP_PUBLIC_URL}
+            emailSubject="AFIA Entity Graph summary"
+          />
         </div>
       </div>
 
