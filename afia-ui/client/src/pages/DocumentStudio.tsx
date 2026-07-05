@@ -18,6 +18,7 @@ import {
   type FhirExportResult,
 } from "@/services/openmed-client";
 import { FhirExportModal } from "@/components/FhirExportModal";
+import { DocumentInsights } from "@/components/charts/DocumentInsights";
 import {
   saveDocument,
   getDocument,
@@ -919,6 +920,18 @@ export default function DocumentStudio() {
                         ))
                       )}
                     </div>
+                    {!analyzing && analysisResult && entityCount > 0 && (
+                      <DocumentInsights
+                        entities={entities}
+                        groupedEntities={groupedEntities}
+                        entityCount={entityCount}
+                        pageCount={uploadedDoc.page_count}
+                        documentLength={
+                          analysisResult.text.length ||
+                          uploadedDoc.full_text.length
+                        }
+                      />
+                    )}
                   </CardContent>
                 </Card>
 
