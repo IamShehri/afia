@@ -11,6 +11,7 @@ import uvicorn
 import fitz  # PyMuPDF
 import hashlib
 import io
+from markitdown import MarkItDown
 import re
 from collections import Counter
 from datetime import datetime, timezone, timedelta
@@ -404,45 +405,109 @@ def extract_pii(req: AnalyzeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+_MARKITDOWN = MarkItDown(enable_plugins=False)
+MARKITDOWN_EXTENSIONS = frozenset({".docx", ".pptx", ".xlsx", ".txt", ".html", ".htm"})
+UPLOAD_EXTENSIONS = MARKITDOWN_EXTENSIONS | {".pdf"}
+
+
+def _upload_extension(filename: Optional[str]) -> str:
+    if not filename:
+        return ""
+    return Path(filename).suffix.lower()
+
+
+def _pdf_pages_from_content(content: bytes) -> tuple[str, list[dict]]:
+    doc = fitz.open(stream=content, filetype="pdf")
+    pages: list[dict] = []
+    full_text = ""
+    offset = 0
+
+    for page_num, page in enumerate(doc):
+        page_text = page.get_text()
+        page_start = offset
+        page_end = offset + len(page_text)
+
+        pages.append({
+            "page_number": page_num + 1,
+            "text": page_text,
+            "char_start": page_start,
+            "char_end": page_end,
+            "width": page.rect.width,
+            "height": page.rect.height,
+        })
+
+        full_text += page_text
+        offset = page_end
+
+    doc.close()
+    return full_text, pages
+
+
+def _markitdown_text_from_content(content: bytes, ext: str) -> str:
+    result = _MARKITDOWN.convert_stream(
+        io.BytesIO(content),
+        file_extension=ext,
+    )
+    return result.text_content or ""
+
+
+def _single_text_page(full_text: str) -> list[dict]:
+    return [{
+        "page_number": 1,
+        "text": full_text,
+        "char_start": 0,
+        "char_end": len(full_text),
+        "width": 0.0,
+        "height": 0.0,
+    }]
+
+
+def _build_upload_response(content: bytes, filename: Optional[str]) -> dict:
+    digest = hashlib.sha256(content).hexdigest()[:16]
+    ext = _upload_extension(filename)
+
+    if ext == ".pdf":
+        full_text, pages = _pdf_pages_from_content(content)
+    elif ext in MARKITDOWN_EXTENSIONS:
+        full_text = _markitdown_text_from_content(content, ext)
+        pages = _single_text_page(full_text)
+    else:
+        supported = ", ".join(sorted(UPLOAD_EXTENSIONS))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: {ext or 'unknown'}. Supported: {supported}",
+        )
+
+    return {
+        "document_id": digest,
+        "filename": filename,
+        "page_count": len(pages),
+        "full_text": full_text,
+        "pages": pages,
+    }
+
+
+async def _read_and_upload(file: UploadFile) -> dict:
+    content = await file.read()
+    try:
+        return _build_upload_response(content, file.filename)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/upload")
+async def upload_document(file: UploadFile = File(...)):
+    return await _read_and_upload(file)
+
+
 @app.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
-    try:
-        content = await file.read()
-        digest = hashlib.sha256(content).hexdigest()[:16]
-        
-        doc = fitz.open(stream=content, filetype="pdf")
-        pages = []
-        full_text = ""
-        offset = 0
-        
-        for page_num, page in enumerate(doc):
-            page_text = page.get_text()
-            page_start = offset
-            page_end = offset + len(page_text)
-            
-            pages.append({
-                "page_number": page_num + 1,
-                "text": page_text,
-                "char_start": page_start,
-                "char_end": page_end,
-                "width": page.rect.width,
-                "height": page.rect.height,
-            })
-            
-            full_text += page_text
-            offset = page_end
-        
-        doc.close()
-        
-        return {
-            "document_id": digest,
-            "filename": file.filename,
-            "page_count": len(pages),
-            "full_text": full_text,
-            "pages": pages,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    ext = _upload_extension(file.filename)
+    if ext and ext != ".pdf":
+        raise HTTPException(status_code=400, detail="upload-pdf accepts PDF files only")
+    return await _read_and_upload(file)
 
 @app.post("/render-page")
 async def render_page(

@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader, SectionLabel } from "@/components/primitives";
 import { cn } from "@/lib/utils";
 import {
-  uploadPDF,
+  uploadDocument,
   analyzeDocument,
   askDocument,
   exportFhir,
@@ -39,6 +39,12 @@ import { ExternalSearchMenu } from "@/components/ExternalSearchMenu";
 import { APP_PUBLIC_URL } from "@/const";
 import { buildDocumentShareText } from "@/lib/social-share";
 import {
+  UPLOAD_ACCEPT,
+  UPLOAD_FORMATS,
+  isSupportedUploadFile,
+  uploadFormatForFilename,
+} from "@/lib/supported-upload-formats";
+import {
   FileText,
   Upload,
   Loader2,
@@ -56,6 +62,24 @@ import {
   FileJson,
   type LucideIcon,
 } from "lucide-react";
+
+function UploadFormatIcons() {
+  return (
+    <div className="mt-1 flex flex-wrap items-center justify-center gap-4">
+      {UPLOAD_FORMATS.map((format) => (
+        <div
+          key={format.ext}
+          className="flex flex-col items-center gap-1 text-muted-foreground"
+        >
+          <format.icon className="size-5" aria-hidden />
+          <span className="text-[10px] font-medium uppercase tracking-wide">
+            {format.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function downloadFile(content: string, filename: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
@@ -593,20 +617,20 @@ export default function DocumentStudio() {
       size: file.size,
       type: file.type,
     });
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      setError("Only PDF files are supported.");
+    if (!isSupportedUploadFile(file)) {
+      setError("Unsupported file type. Use PDF, Word, PowerPoint, Excel, text, or HTML.");
       return;
     }
     setError(null);
     setAnalysisResult(null);
     setUploading(true);
     try {
-      console.log("[DocumentStudio] uploading PDF to:", `${BASE_URL}/upload-pdf`);
+      console.log("[DocumentStudio] uploading to:", `${BASE_URL}/upload`);
       let doc: UploadedDocument;
       try {
-        doc = await uploadPDF(file);
+        doc = await uploadDocument(file);
       } catch (uploadErr) {
-        console.error("[DocumentStudio] uploadPDF failed:", uploadErr);
+        console.error("[DocumentStudio] uploadDocument failed:", uploadErr);
         throw uploadErr;
       }
       setUploadedDoc(doc);
@@ -725,13 +749,17 @@ export default function DocumentStudio() {
       ? entities.reduce((sum, e) => sum + e.confidence, 0) / entities.length
       : 0;
   const maxLabelCount = groupedEntities.length > 0 ? groupedEntities[0][1].length : 0;
+  const openFormat = uploadedDoc
+    ? uploadFormatForFilename(uploadedDoc.filename)
+    : null;
+  const OpenFormatIcon = openFormat?.icon ?? FileText;
 
   return (
     <div className="h-full flex flex-col bg-background">
       <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-4">
         <PageHeader
           title="Document Studio"
-          subtitle="Upload clinical PDFs and detect entities across the full document"
+          subtitle="Upload clinical documents and detect entities across the full text"
         />
         {!uploadedDoc && <AnalysisModelPicker className="shrink-0" />}
       </div>
@@ -749,7 +777,7 @@ export default function DocumentStudio() {
             <input
               ref={inputRef}
               type="file"
-              accept="application/pdf,.pdf"
+              accept={UPLOAD_ACCEPT}
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -784,12 +812,15 @@ export default function DocumentStudio() {
               )}
               <div>
                 <p className="text-sm font-medium">
-                  {uploading ? "Uploading…" : "Drop a PDF here or click to browse"}
+                  {uploading
+                    ? "Uploading…"
+                    : "Drop a document here or click to browse"}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  PDF files only
+                  PDF, Word, PowerPoint, Excel, text, or HTML
                 </p>
               </div>
+              {!uploading && <UploadFormatIcons />}
             </button>
           </>
         ) : (
@@ -797,7 +828,7 @@ export default function DocumentStudio() {
             {/* Document header */}
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <FileText className="size-5 shrink-0 text-muted-foreground" />
+                <OpenFormatIcon className="size-5 shrink-0 text-muted-foreground" />
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium">{uploadedDoc.filename}</p>

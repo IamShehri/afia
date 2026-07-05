@@ -4,3 +4,4 @@
 # Core bridge deps (openmed, fastapi, uvicorn, pymupdf) are assumed installed separately.
 sentence-transformers==5.6.0
 fhir.resources==8.3.0
+markitdown[docx,pptx,xlsx]>=0.1.0

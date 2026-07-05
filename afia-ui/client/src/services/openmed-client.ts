@@ -109,15 +109,31 @@ export interface DocumentAnalysisResult {
   model_used?: string | null;
 }
 
-export async function uploadPDF(file: File): Promise<UploadedDocument> {
+export async function uploadDocument(file: File): Promise<UploadedDocument> {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${BASE_URL}/upload-pdf`, {
+  const res = await fetch(`${BASE_URL}/upload`, {
     method: "POST",
     body: formData,
   });
-  if (!res.ok) throw new Error("PDF upload failed");
+  if (!res.ok) {
+    let message = "Upload failed";
+    try {
+      const body = (await res.json()) as { detail?: string };
+      if (typeof body.detail === "string" && body.detail.length > 0) {
+        message = body.detail;
+      }
+    } catch {
+      /* use default message */
+    }
+    throw new Error(message);
+  }
   return res.json();
+}
+
+/** @deprecated Prefer uploadDocument — kept for callers not yet migrated. */
+export async function uploadPDF(file: File): Promise<UploadedDocument> {
+  return uploadDocument(file);
 }
 
 export async function analyzeDocument(

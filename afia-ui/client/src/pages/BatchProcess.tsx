@@ -4,10 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/primitives";
 import { cn } from "@/lib/utils";
-import { uploadPDF, analyzeDocument } from "@/services/openmed-client";
+import { uploadDocument, analyzeDocument } from "@/services/openmed-client";
 import { saveDocument } from "@/lib/documents";
 import { resolveAnalysisModel } from "@/services/model-preference";
-import { FileText, Upload, Loader2, ExternalLink } from "lucide-react";
+import {
+  UPLOAD_ACCEPT,
+  isSupportedUploadFile,
+  uploadFormatForFile,
+} from "@/lib/supported-upload-formats";
+import { Upload, Loader2, ExternalLink } from "lucide-react";
 
 type FileStatus = "queued" | "uploading" | "analyzing" | "done" | "error";
 
@@ -41,13 +46,11 @@ export default function BatchProcess() {
 
   const addFiles = (list: FileList | null) => {
     if (!list) return;
-    const pdfs = Array.from(list).filter((f) =>
-      f.name.toLowerCase().endsWith(".pdf"),
-    );
-    if (pdfs.length === 0) return;
+    const supported = Array.from(list).filter((f) => isSupportedUploadFile(f));
+    if (supported.length === 0) return;
     setFiles((prev) => [
       ...prev,
-      ...pdfs.map((file) => ({ file, status: "queued" as FileStatus })),
+      ...supported.map((file) => ({ file, status: "queued" as FileStatus })),
     ]);
   };
 
@@ -72,7 +75,7 @@ export default function BatchProcess() {
       if (!current) continue;
       try {
         updateFile(index, { status: "uploading", error: undefined });
-        const doc = await uploadPDF(current.file);
+        const doc = await uploadDocument(current.file);
         updateFile(index, { status: "analyzing" });
         const result = await analyzeDocument(
           doc.full_text,
@@ -121,7 +124,7 @@ export default function BatchProcess() {
             <input
               ref={inputRef}
               type="file"
-              accept="application/pdf,.pdf"
+              accept={UPLOAD_ACCEPT}
               multiple
               className="hidden"
               onChange={(e) => {
@@ -148,10 +151,10 @@ export default function BatchProcess() {
               <Upload className="size-8 text-muted-foreground" />
               <div>
                 <p className="text-sm font-medium">
-                  Drop PDFs here or click to browse
+                  Drop documents here or click to browse
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Multiple PDF files supported
+                  PDF, Word, PowerPoint, Excel, text, or HTML — multiple files
                 </p>
               </div>
             </button>
@@ -191,12 +194,13 @@ export default function BatchProcess() {
               {files.map((f, i) => {
                 const meta = STATUS_META[f.status];
                 const busy = f.status === "uploading" || f.status === "analyzing";
+                const FormatIcon = uploadFormatForFile(f.file)?.icon ?? Upload;
                 return (
                   <div
                     key={`${f.file.name}-${i}`}
                     className="flex items-center gap-3 border-b border-hairline px-3 py-3 last:border-b-0"
                   >
-                    <FileText className="size-5 shrink-0 text-muted-foreground" />
+                    <FormatIcon className="size-5 shrink-0 text-muted-foreground" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">
                         {f.file.name}
