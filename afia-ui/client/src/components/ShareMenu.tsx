@@ -12,16 +12,35 @@ export interface ShareMenuProps {
   text: string;
   url: string;
   emailSubject?: string;
+  /** Compact icon-only trigger for the top bar (32px). */
+  variant?: "default" | "icon";
 }
 
-export function ShareMenu({ text, url, emailSubject }: ShareMenuProps) {
+export function ShareMenu({
+  text,
+  url,
+  emailSubject,
+  variant = "default",
+}: ShareMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" aria-label="Share">
-          <Share2 className="size-4" />
-          Share
-        </Button>
+        {variant === "icon" ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Share"
+            title="Share"
+            className="size-8"
+          >
+            <Share2 className="size-4" />
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" aria-label="Share">
+            <Share2 className="size-4" />
+            Share
+          </Button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem

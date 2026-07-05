@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { useTeamWorkspace } from "@/contexts/TeamWorkspaceContext";
+import { documentStudioHref } from "@/lib/document-navigation";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
@@ -33,6 +35,7 @@ function heatMix(color: string, intensity: number): string {
 
 export function CooccurrenceMatrixPanel({ docs }: CooccurrenceMatrixProps) {
   const [, setLocation] = useLocation();
+  const { activeWorkspaceId } = useTeamWorkspace();
   const [topN, setTopN] = useState(12);
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(
     null,
@@ -258,11 +261,18 @@ export function CooccurrenceMatrixPanel({ docs }: CooccurrenceMatrixProps) {
           {selectedDocs.length > 0 && (
             <ul className="mt-2 max-h-32 space-y-1 overflow-auto">
               {selectedDocs.map((doc) => (
-                <li key={doc.id}>
+                <li key={doc.rowId}>
                   <button
                     type="button"
                     className="text-primary hover:underline"
-                    onClick={() => setLocation(`/documents?doc=${doc.id}`)}
+                    onClick={() =>
+                      setLocation(
+                        documentStudioHref(
+                          { id: doc.id, rowId: doc.rowId },
+                          doc.workspaceId ?? activeWorkspaceId,
+                        ),
+                      )
+                    }
                   >
                     {doc.filename}
                   </button>

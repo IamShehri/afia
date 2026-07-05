@@ -9,6 +9,8 @@ import {
   type StoredDocument,
   type DocumentStatus,
 } from "@/lib/documents";
+import { documentStudioHref } from "@/lib/document-navigation";
+import { useTeamWorkspace } from "@/contexts/TeamWorkspaceContext";
 import {
   FileText,
   Files,
@@ -92,13 +94,14 @@ function StatCard({
 
 export default function MyResearch() {
   const [, setLocation] = useLocation();
+  const { activeWorkspaceId, activeWorkspace } = useTeamWorkspace();
   const [allDocs, setAllDocs] = useState<StoredDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   useEffect(() => {
     let active = true;
-    listDocuments()
+    listDocuments({ workspaceId: activeWorkspaceId })
       .then((docs) => {
         if (active) setAllDocs(filterUserDocuments(docs));
       })
@@ -111,7 +114,7 @@ export default function MyResearch() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [activeWorkspaceId]);
 
   const counts = useMemo(
     () => ({
@@ -136,7 +139,11 @@ export default function MyResearch() {
       <div className="max-w-5xl mx-auto p-6 space-y-6">
         <PageHeader
           title="My Research"
-          subtitle="Track your document review progress"
+          subtitle={
+            activeWorkspace
+              ? `Documents in ${activeWorkspace.name}`
+              : "Your personal document library"
+          }
         />
 
         {/* Row 1 — Summary stats */}
@@ -198,7 +205,9 @@ export default function MyResearch() {
                 <button
                   key={doc.id}
                   type="button"
-                  onClick={() => setLocation(`/documents?doc=${doc.id}`)}
+                  onClick={() =>
+                    setLocation(documentStudioHref(doc, activeWorkspaceId))
+                  }
                   className="flex w-full cursor-pointer items-center gap-3 border-b border-hairline px-2 py-3 text-left transition-colors last:border-b-0 hover:bg-elevated"
                 >
                   <FileText className="size-5 shrink-0 text-muted-foreground" />

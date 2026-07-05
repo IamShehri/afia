@@ -1,4 +1,5 @@
 import { TopBar } from "./TopBar";
+import { BreadcrumbBar } from "./BreadcrumbBar";
 import { PrimaryRail } from "./PrimaryRail";
 import { SecondaryBar } from "./SecondaryBar";
 import { Inspector } from "./Inspector";
@@ -11,8 +12,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      {/* Top command bar */}
       <TopBar />
+      <BreadcrumbBar />
 
       {/* Main workspace grid */}
       <div className="flex flex-1 overflow-hidden">

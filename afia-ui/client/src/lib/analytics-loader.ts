@@ -28,8 +28,15 @@ export async function loadLibrarySummaries(
       skippedUnanalyzed: number;
     }) => void;
   },
+  options?: { workspaceId?: string | null },
 ): Promise<LibraryLoadResult> {
-  const index = filterUserDocuments(await listDocuments());
+  const index = filterUserDocuments(
+    await listDocuments(
+      options && "workspaceId" in options
+        ? { workspaceId: options.workspaceId }
+        : undefined,
+    ),
+  );
   const totalInLibrary = index.length;
   const truncated = totalInLibrary > LIBRARY_ANALYTICS_CAP;
   const scanBatch = index.slice(0, LIBRARY_ANALYTICS_CAP);
@@ -45,13 +52,18 @@ export async function loadLibrarySummaries(
     await Promise.all(
       chunk.map(async (item) => {
         try {
-          const full = await getDocument(item.id);
+          const full = await getDocument(item.id, {
+            documentId: item.rowId,
+            workspaceId: item.workspaceId ?? options?.workspaceId,
+          });
           if (!full || full.entities.length === 0) {
             skippedUnanalyzed += 1;
             return;
           }
           analyzed.push({
             id: full.id,
+            rowId: full.rowId,
+            workspaceId: full.workspaceId,
             filename: full.filename,
             entities: full.entities,
             lastAccessedAt: full.lastAccessedAt,

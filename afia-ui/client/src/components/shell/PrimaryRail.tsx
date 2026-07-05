@@ -1,29 +1,10 @@
 import { useLocation } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Monogram } from "@/components/primitives";
 import { railNav } from "@/data/nav";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { LogOut, Settings } from "lucide-react";
 
 export function PrimaryRail() {
   const [location, setLocation] = useLocation();
-  const { user, signOut } = useAuth();
-
-  const displayName = user?.email?.split("@")[0] ?? "User";
-  const displayEmail = user?.email ?? "Signed in";
-
-  const handleSignOut = async () => {
-    await signOut();
-    setLocation("/login");
-  };
 
   return (
     <div className="flex h-full w-14 flex-col gap-2 border-r border-hairline bg-rail px-1.5 py-3">
@@ -53,49 +34,6 @@ export function PrimaryRail() {
           );
         })}
       </div>
-
-      <div className="flex-1" />
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Account menu"
-            title="Account"
-            className="rounded-full"
-          >
-            <Monogram name={displayName} hue={210} size={24} />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="right" align="end" className="w-48">
-          <div className="flex items-center gap-3 px-3 py-2">
-            <Monogram name={displayName} hue={210} size={32} />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium">{displayName}</div>
-              <div className="truncate text-xs text-muted-foreground">
-                {displayEmail}
-              </div>
-            </div>
-          </div>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setLocation("/settings")}
-            className="cursor-pointer"
-          >
-            <Settings className="size-4" />
-            <span>Settings</span>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => void handleSignOut()}
-            className="cursor-pointer text-destructive"
-          >
-            <LogOut className="size-4" />
-            <span>Sign out</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
   );
 }

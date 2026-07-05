@@ -26,7 +26,11 @@ import {
   updateDocumentStatus,
   type StoredDocument,
   type DocumentStatus,
+  type DocumentLookupOptions,
 } from "@/lib/documents";
+import { parseDocumentStudioSearch } from "@/lib/document-navigation";
+import { useTeamWorkspace } from "@/contexts/TeamWorkspaceContext";
+import { MoveToWorkspaceMenu } from "@/components/document-studio/MoveToWorkspaceMenu";
 import { logAction } from "@/lib/audit";
 import { resolveAnalysisModel } from "@/services/model-preference";
 import { ShareMenu } from "@/components/ShareMenu";
@@ -417,6 +421,22 @@ export default function DocumentStudio() {
   const [fhirResult, setFhirResult] = useState<FhirExportResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const search = useSearch();
+  const { activeWorkspaceId, canEditInActiveWorkspace } = useTeamWorkspace();
+  const [storedRowId, setStoredRowId] = useState<string | null>(null);
+  const [storedWorkspaceId, setStoredWorkspaceId] = useState<string | null>(
+    null,
+  );
+
+  const documentLookup = useMemo((): DocumentLookupOptions => {
+    const { workspaceHint } = parseDocumentStudioSearch(search);
+    return {
+      documentId: storedRowId ?? undefined,
+      workspaceId:
+        workspaceHint !== undefined
+          ? workspaceHint
+          : storedWorkspaceId ?? activeWorkspaceId,
+    };
+  }, [search, storedRowId, storedWorkspaceId, activeWorkspaceId]);
 
   const groupedEntities = useMemo(() => {
     const groups = new Map<string, DocumentEntity[]>();
@@ -435,13 +455,18 @@ export default function DocumentStudio() {
 
   // Restore a previously stored document when navigated to with ?doc=<id>.
   useEffect(() => {
-    const params = new URLSearchParams(search);
-    const docId = params.get("doc");
+    const { docId, rowId, workspaceHint } = parseDocumentStudioSearch(search);
     if (!docId) return;
     let active = true;
-    getDocument(docId)
+    getDocument(docId, {
+      documentId: rowId ?? undefined,
+      workspaceId:
+        workspaceHint !== undefined ? workspaceHint : activeWorkspaceId,
+    })
       .then((stored: StoredDocument | null) => {
         if (!active || !stored) return;
+        setStoredRowId(stored.rowId);
+        setStoredWorkspaceId(stored.workspaceId);
         setUploadedDoc({
           document_id: stored.id,
           filename: stored.filename,
@@ -469,9 +494,11 @@ export default function DocumentStudio() {
     return () => {
       active = false;
     };
-  }, [search]);
+  }, [search, activeWorkspaceId]);
 
   const reset = () => {
+    setStoredRowId(null);
+    setStoredWorkspaceId(null);
     setUploadedDoc(null);
     setUploading(false);
     setAnalyzing(false);
@@ -535,16 +562,20 @@ export default function DocumentStudio() {
       const nextStatus: DocumentStatus =
         status === "reviewed" ? "reviewed" : "in_progress";
       setStatus(nextStatus);
-      await updateDocument(uploadedDoc.document_id, {
-        status: nextStatus,
-        metadata: {
-          page_count: uploadedDoc.page_count,
-          entities: analysisResult?.entities || [],
-          model_used: analysisResult?.model_used ?? undefined,
-          qa_history: nextHistory,
-          last_accessed_at: Date.now(),
+      await updateDocument(
+        uploadedDoc.document_id,
+        {
+          status: nextStatus,
+          metadata: {
+            page_count: uploadedDoc.page_count,
+            entities: analysisResult?.entities || [],
+            model_used: analysisResult?.model_used ?? undefined,
+            qa_history: nextHistory,
+            last_accessed_at: Date.now(),
+          },
         },
-      });
+        documentLookup,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Question failed");
     } finally {
@@ -589,18 +620,23 @@ export default function DocumentStudio() {
         );
         setAnalysisResult(result);
         setStatus("new");
-        await saveDocument({
-          id: doc.document_id,
-          filename: doc.filename,
-          full_text: doc.full_text,
-          page_count: doc.page_count,
-          status: "new",
-          entities: result.entities,
-          modelUsed: result.model_used ?? undefined,
-          qaHistory: [],
-          uploadedAt: Date.now(),
-          lastAccessedAt: Date.now(),
-        });
+        const saved = await saveDocument(
+          {
+            id: doc.document_id,
+            filename: doc.filename,
+            full_text: doc.full_text,
+            page_count: doc.page_count,
+            status: "new",
+            entities: result.entities,
+            modelUsed: result.model_used ?? undefined,
+            qaHistory: [],
+            uploadedAt: Date.now(),
+            lastAccessedAt: Date.now(),
+          },
+          activeWorkspaceId,
+        );
+        setStoredRowId(saved.rowId);
+        setStoredWorkspaceId(saved.workspaceId);
       } finally {
         setAnalyzing(false);
       }
@@ -629,15 +665,19 @@ export default function DocumentStudio() {
         await resolveAnalysisModel(),
       );
       setAnalysisResult(result);
-      await updateDocument(uploadedDoc.document_id, {
-        metadata: {
-          page_count: uploadedDoc.page_count,
-          entities: result.entities,
-          model_used: result.model_used ?? undefined,
-          qa_history: qaHistory,
-          last_accessed_at: Date.now(),
+      await updateDocument(
+        uploadedDoc.document_id,
+        {
+          metadata: {
+            page_count: uploadedDoc.page_count,
+            entities: result.entities,
+            model_used: result.model_used ?? undefined,
+            qa_history: qaHistory,
+            last_accessed_at: Date.now(),
+          },
         },
-      });
+        documentLookup,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Re-analysis failed");
     } finally {
@@ -763,12 +803,14 @@ export default function DocumentStudio() {
                     <p className="text-sm font-medium">{uploadedDoc.filename}</p>
                     <select
                       value={status}
+                      disabled={!canEditInActiveWorkspace}
                       onChange={(e) => {
                         const next = e.target.value as DocumentStatus;
                         setStatus(next);
                         void updateDocumentStatus(
                           uploadedDoc.document_id,
                           next,
+                          documentLookup,
                         );
                       }}
                       aria-label="Review status"
@@ -823,6 +865,16 @@ export default function DocumentStudio() {
                       )}
                       url={APP_PUBLIC_URL}
                     />
+                    {storedRowId && (
+                      <MoveToWorkspaceMenu
+                        bridgeDocumentId={uploadedDoc.document_id}
+                        currentWorkspaceId={storedWorkspaceId}
+                        lookup={documentLookup}
+                        onMoved={(workspaceId) =>
+                          setStoredWorkspaceId(workspaceId)
+                        }
+                      />
+                    )}
                   </>
                 )}
                 <Button variant="outline" size="sm" onClick={reset}>

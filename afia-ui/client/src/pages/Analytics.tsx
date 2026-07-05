@@ -14,6 +14,7 @@ import { ResearchDataExportButton } from "@/components/analytics/ResearchDataExp
 import { ResearchReportButton } from "@/components/analytics/ResearchReportButton";
 import { logAction } from "@/lib/audit";
 import { loadLibrarySummaries } from "@/lib/analytics-loader";
+import { useTeamWorkspace } from "@/contexts/TeamWorkspaceContext";
 import { ShareMenu } from "@/components/ShareMenu";
 import { APP_PUBLIC_URL } from "@/const";
 import { buildAnalyticsShareText } from "@/lib/social-share";
@@ -71,6 +72,7 @@ function StatCard({
 export default function Analytics() {
   const [, setLocation] = useLocation();
   const search = useSearch();
+  const { activeWorkspaceId, activeWorkspace } = useTeamWorkspace();
   const auditedRef = useRef(false);
   const activeTab = parseAnalyticsTab(search);
 
@@ -100,15 +102,18 @@ export default function Analytics() {
     setDocAId("");
     setDocBId("");
     try {
-      const result = await loadLibrarySummaries({
-        onProgress: (loaded, total) => {
-          setProgress({ loaded, total });
+      const result = await loadLibrarySummaries(
+        {
+          onProgress: (loaded, total) => {
+            setProgress({ loaded, total });
+          },
+          onPartial: ({ analyzed, skippedUnanalyzed: skipped }) => {
+            setAnalyzedDocs(analyzed);
+            setSkippedUnanalyzed(skipped);
+          },
         },
-        onPartial: ({ analyzed, skippedUnanalyzed: skipped }) => {
-          setAnalyzedDocs(analyzed);
-          setSkippedUnanalyzed(skipped);
-        },
-      });
+        { workspaceId: activeWorkspaceId },
+      );
       setAnalyzedDocs(result.analyzed);
       setSkippedUnanalyzed(result.skippedUnanalyzed);
       setTruncated(result.truncated);
@@ -123,7 +128,7 @@ export default function Analytics() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
     if (!auditedRef.current) {
@@ -163,7 +168,11 @@ export default function Analytics() {
         <div className="flex items-start justify-between gap-4">
           <PageHeader
             title="Analytics Lab"
-            subtitle="Cross-document intelligence and research workbench"
+            subtitle={
+              activeWorkspace
+                ? `Cross-document intelligence in ${activeWorkspace.name}`
+                : "Cross-document intelligence and research workbench"
+            }
           />
           <div className="flex shrink-0 items-center gap-2">
             {!showEmpty && analyzedDocs.length >= 2 && (

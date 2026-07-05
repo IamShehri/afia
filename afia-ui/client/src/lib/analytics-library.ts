@@ -3,6 +3,8 @@ import type { DocumentEntity } from "@/lib/documents";
 /** Slim in-memory shape — avoids caching full PDF text. */
 export interface AnalyzedDocSummary {
   id: string;
+  rowId: string;
+  workspaceId: string | null;
   filename: string;
   entities: DocumentEntity[];
   lastAccessedAt: number;

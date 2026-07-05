@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,17 +7,29 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AfiaWordmark } from "@/components/brand/AfiaMark";
 import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { storeInviteReturnToken } from "@/pages/InviteAccept";
 
 type AuthMode = "signin" | "signup";
 
 export default function Login() {
   const { signIn, signUp } = useAuth();
+  const search = useSearch();
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    const next = new URLSearchParams(
+      search.startsWith("?") ? search.slice(1) : search,
+    ).get("next");
+    if (next?.startsWith("/invite/")) {
+      const token = next.split("/").pop();
+      if (token) storeInviteReturnToken(token);
+    }
+  }, [search]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

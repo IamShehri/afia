@@ -5,7 +5,12 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/primitives";
 import { ExternalSearchMenu } from "@/components/ExternalSearchMenu";
+import { WorkspaceSwitcher } from "@/components/shell/WorkspaceSwitcher";
+import { AccountMenu } from "@/components/shell/AccountMenu";
+import { ShareMenu } from "@/components/ShareMenu";
 import { AfiaWordmark } from "@/components/brand/AfiaMark";
+import { APP_PUBLIC_URL } from "@/const";
+import { HOME_SHARE_TEXT } from "@/lib/social-share";
 import {
   studioNav,
   labNav,
@@ -17,8 +22,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Moon, Sun, ChevronDown } from "lucide-react";
+import { Search, Moon, Sun, ChevronDown, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 function NavMenuDropdown({
   label,
@@ -71,8 +77,16 @@ export function TopBar() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const openAfiaSearch = () => {
+    setPaletteOpen(true);
+  };
+
+  const focusSearchInput = () => {
+    searchInputRef.current?.focus();
+  };
+
   return (
-    <div className="flex h-12 items-center gap-3 border-b border-hairline bg-background px-4">
+    <div className="flex h-12 shrink-0 items-center gap-3 border-b border-hairline bg-background px-4">
       <Button
         variant="ghost"
         size="sm"
@@ -82,6 +96,8 @@ export function TopBar() {
       >
         <AfiaWordmark className="text-primary" />
       </Button>
+
+      <WorkspaceSwitcher />
 
       <NavMenuDropdown
         label="Studio"
@@ -96,10 +112,10 @@ export function TopBar() {
         onNavigate={setLocation}
       />
 
-      <div className="flex h-8 min-w-0 flex-1 max-w-md items-center rounded-md border border-hairline bg-surface transition-colors hover:border-hairline-strong">
+      <div className="flex h-8 min-w-0 max-w-md flex-1 items-center rounded-md border border-hairline bg-surface transition-colors hover:border-hairline-strong">
         <button
           type="button"
-          onClick={() => setPaletteOpen(true)}
+          onClick={openAfiaSearch}
           className="flex shrink-0 items-center pl-3 press"
           aria-label="Open command palette"
           title="Open command palette (⌘K)"
@@ -117,15 +133,24 @@ export function TopBar() {
         />
         <ExternalSearchMenu
           query={searchQuery}
-          onEmptyQuery={() => searchInputRef.current?.focus()}
+          onEmptyQuery={focusSearchInput}
+          onSearchAfia={openAfiaSearch}
+          align="start"
         />
         <Kbd className="mr-2 hidden shrink-0 sm:inline">⌘K</Kbd>
       </div>
 
+      {/* Right cluster (right→left: account · notifications · theme · share) */}
       <div className="ml-auto flex shrink-0 items-center gap-1">
+        <ShareMenu
+          text={HOME_SHARE_TEXT}
+          url={APP_PUBLIC_URL}
+          variant="icon"
+        />
         <Button
           variant="ghost"
           size="icon-sm"
+          className="size-8"
           onClick={() => toggleTheme?.()}
           aria-label="Toggle appearance"
           title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
@@ -136,6 +161,17 @@ export function TopBar() {
             <Moon className="size-4" />
           )}
         </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="size-8"
+          aria-label="Notifications"
+          title="Notifications (coming soon)"
+          onClick={() => toast.message("Notifications coming soon")}
+        >
+          <Bell className="size-4" />
+        </Button>
+        <AccountMenu />
       </div>
     </div>
   );

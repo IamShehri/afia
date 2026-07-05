@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
+import { useTeamWorkspace } from "@/contexts/TeamWorkspaceContext";
+import { documentStudioHref } from "@/lib/document-navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -58,6 +60,7 @@ interface EntityGraphPanelProps {
 
 export function EntityGraphPanel({ analyzedDocs }: EntityGraphPanelProps) {
   const [, setLocation] = useLocation();
+  const { activeWorkspaceId } = useTeamWorkspace();
   const svgRef = useRef<SVGSVGElement | null>(null);
   const editorFocusedRef = useRef(false);
   const baselineRef = useRef<LibraryGraphSpec | null>(null);
@@ -383,12 +386,17 @@ export function EntityGraphPanel({ analyzedDocs }: EntityGraphPanelProps) {
                 </div>
                 <ul className="max-h-40 space-y-1 overflow-auto text-sm">
                   {selectedDocs.map((doc) => (
-                    <li key={doc.id}>
+                    <li key={doc.rowId}>
                       <button
                         type="button"
                         className="text-left text-primary hover:underline"
                         onClick={() =>
-                          setLocation(`/documents?doc=${doc.id}`)
+                          setLocation(
+                            documentStudioHref(
+                              { id: doc.id, rowId: doc.rowId },
+                              doc.workspaceId ?? activeWorkspaceId,
+                            ),
+                          )
                         }
                       >
                         {doc.filename}

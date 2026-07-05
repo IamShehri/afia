@@ -6,6 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { WorkspaceProvider } from "./contexts/WorkspaceContext";
+import { TeamWorkspaceProvider } from "./contexts/TeamWorkspaceContext";
 import { CommandPalette } from "./components/command/CommandPalette";
 import { AppShell } from "./components/shell/AppShell";
 import Login from "./pages/Login";
@@ -26,7 +27,11 @@ import Analytics from "./pages/Analytics";
 import AnalyticsReport from "./pages/AnalyticsReport";
 import { Loader2 } from "lucide-react";
 import Settings from "./pages/Settings";
+import WorkspaceSettings from "./pages/WorkspaceSettings";
+import InviteAccept from "./pages/InviteAccept";
+import { consumeInviteReturnToken } from "./pages/InviteAccept";
 import { useEffect } from "react";
+import { useLocation } from "wouter";
 import { preloadDefaultAnalysisModel } from "./services/model-preference";
 
 function AuthLoading() {
@@ -48,10 +53,26 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function InviteReturnHandler() {
+  const { session, loading } = useAuth();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (loading || !session) return;
+    const token = consumeInviteReturnToken();
+    if (token) {
+      setLocation(`/invite/${token}`);
+    }
+  }, [session, loading, setLocation]);
+
+  return null;
+}
+
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/invite/:token" component={InviteAccept} />
 
       <Route path="/">{() => <PrivateRoute><Shell><Home /></Shell></PrivateRoute>}</Route>
       <Route path="/patients">{() => <PrivateRoute><Shell><Patients /></Shell></PrivateRoute>}</Route>
@@ -65,6 +86,15 @@ function Router() {
       <Route path="/analytics/report">{() => <PrivateRoute><AnalyticsReport /></PrivateRoute>}</Route>
       <Route path="/analytics">{() => <PrivateRoute><Shell><Analytics /></Shell></PrivateRoute>}</Route>
       <Route path="/research">{() => <PrivateRoute><Shell><MyResearch /></Shell></PrivateRoute>}</Route>
+      <Route path="/workspace/:id">
+        {(params) => (
+          <PrivateRoute>
+            <Shell>
+              <WorkspaceSettings />
+            </Shell>
+          </PrivateRoute>
+        )}
+      </Route>
       <Route path="/batch">{() => <PrivateRoute><Shell><BatchProcess /></Shell></PrivateRoute>}</Route>
       <Route path="/compare">{() => <PrivateRoute><Shell><ModelCompare /></Shell></PrivateRoute>}</Route>
       <Route path="/deidentify">{() => <PrivateRoute><Shell><Deidentify /></Shell></PrivateRoute>}</Route>
@@ -91,11 +121,14 @@ function App() {
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider delayDuration={200} skipDelayDuration={0}>
           <AuthProvider>
-            <WorkspaceProvider>
+            <TeamWorkspaceProvider>
+              <WorkspaceProvider>
               <Toaster position="bottom-right" />
               <CommandPalette />
+              <InviteReturnHandler />
               <Router />
-            </WorkspaceProvider>
+              </WorkspaceProvider>
+            </TeamWorkspaceProvider>
           </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>

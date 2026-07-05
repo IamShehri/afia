@@ -76,13 +76,27 @@ export interface StoredDocument {
   modelUsed?: string;
   uploadedAt: number;
   lastAccessedAt: number;
+  workspaceId: string | null;
   metadata?: DocumentMetadata;
+}
+
+export interface DocumentLookupOptions {
+  /** Supabase documents.id — disambiguates shared digest collisions. */
+  documentId?: string;
+  /** Active workspace hint for resolver (null = personal). */
+  workspaceId?: string | null;
+}
+
+export interface ListDocumentsOptions {
+  /** Omit = all accessible; null = personal only; uuid = that workspace. */
+  workspaceId?: string | null;
 }
 
 export interface CreateDocumentOptions {
   bridgeDocumentId: string;
   metadata?: DocumentMetadata;
   status?: DocumentStatus;
+  workspaceId?: string | null;
 }
 
 export interface DocumentPatch {
@@ -90,18 +104,32 @@ export interface DocumentPatch {
   content?: string;
   metadata?: DocumentMetadata;
   status?: DocumentStatus;
+  workspaceId?: string | null;
 }
 
 /** Decrypted document payload returned by documents-crypto Edge Function. */
 interface CryptoDocument {
   id: string;
   rowId: string;
+  workspace_id?: string | null;
   title: string;
   content: string;
   metadata: DocumentMetadata;
   status: string;
   created_at: string;
   updated_at: string;
+}
+
+function applyDocumentLookup(
+  body: Record<string, unknown>,
+  lookup?: DocumentLookupOptions,
+): void {
+  if (lookup?.documentId) {
+    body.document_id = lookup.documentId;
+  }
+  if (lookup && "workspaceId" in lookup) {
+    body.workspace_id = lookup.workspaceId;
+  }
 }
 
 function parseStatus(value: string | null | undefined): DocumentStatus {
@@ -127,6 +155,7 @@ function cryptoDocToStored(doc: CryptoDocument): StoredDocument {
       meta.uploaded_at ?? new Date(doc.created_at).getTime(),
     lastAccessedAt:
       meta.last_accessed_at ?? new Date(doc.updated_at).getTime(),
+    workspaceId: doc.workspace_id ?? null,
     metadata: meta,
   };
 }
@@ -166,35 +195,54 @@ export async function createDocument(
     ...options.metadata,
   };
 
-  const { document } = await invokeDocumentsCrypto<{ document: CryptoDocument }>({
+  const body: Record<string, unknown> = {
     action: "create",
     bridge_document_id: options.bridgeDocumentId,
     title,
     content,
     metadata,
     status: options.status ?? "new",
-  });
+  };
+
+  if (options.workspaceId !== undefined) {
+    body.workspace_id = options.workspaceId;
+  }
+
+  const { document } = await invokeDocumentsCrypto<{ document: CryptoDocument }>(
+    body,
+  );
 
   return cryptoDocToStored(document);
 }
 
-export async function listDocuments(): Promise<StoredDocument[]> {
+export async function listDocuments(
+  options?: ListDocumentsOptions,
+): Promise<StoredDocument[]> {
+  const body: Record<string, unknown> = { action: "list" };
+  if (options && "workspaceId" in options) {
+    body.workspace_id = options.workspaceId;
+  }
+
   const { documents } = await invokeDocumentsCrypto<{
     documents: CryptoDocument[];
-  }>({ action: "list" });
+  }>(body);
 
   return (documents ?? []).map(cryptoDocToStored);
 }
 
 export async function getDocument(
   bridgeDocumentId: string,
+  lookup?: DocumentLookupOptions,
 ): Promise<StoredDocument | null> {
-  const { document } = await invokeDocumentsCrypto<{
-    document: CryptoDocument | null;
-  }>({
+  const body: Record<string, unknown> = {
     action: "get",
     bridge_document_id: bridgeDocumentId,
-  });
+  };
+  applyDocumentLookup(body, lookup);
+
+  const { document } = await invokeDocumentsCrypto<{
+    document: CryptoDocument | null;
+  }>(body);
 
   return document ? cryptoDocToStored(document) : null;
 }
@@ -202,6 +250,7 @@ export async function getDocument(
 export async function updateDocument(
   bridgeDocumentId: string,
   patch: DocumentPatch,
+  lookup?: DocumentLookupOptions,
 ): Promise<StoredDocument> {
   const body: Record<string, unknown> = {
     action: "update",
@@ -212,6 +261,8 @@ export async function updateDocument(
   if (patch.content !== undefined) body.content = patch.content;
   if (patch.status !== undefined) body.status = patch.status;
   if (patch.metadata !== undefined) body.metadata = patch.metadata;
+  if (patch.workspaceId !== undefined) body.workspace_id = patch.workspaceId;
+  applyDocumentLookup(body, lookup);
 
   const { document } = await invokeDocumentsCrypto<{ document: CryptoDocument }>(
     body,
@@ -222,20 +273,29 @@ export async function updateDocument(
 
 export async function deleteDocument(
   bridgeDocumentId: string,
+  lookup?: DocumentLookupOptions,
 ): Promise<void> {
-  await invokeDocumentsCrypto<{ ok: boolean }>({
+  const body: Record<string, unknown> = {
     action: "delete",
     bridge_document_id: bridgeDocumentId,
-  });
+  };
+  applyDocumentLookup(body, lookup);
+
+  await invokeDocumentsCrypto<{ ok: boolean }>(body);
 }
 
 /** Upsert helper used by existing upload/save flows. */
 export async function saveDocument(
-  doc: Omit<StoredDocument, "rowId"> & { rowId?: string },
+  doc: Omit<StoredDocument, "rowId" | "workspaceId"> & {
+    rowId?: string;
+    workspaceId?: string | null;
+  },
+  workspaceId?: string | null,
 ): Promise<StoredDocument> {
   return createDocument(doc.filename, doc.full_text, {
     bridgeDocumentId: doc.id,
     status: doc.status,
+    workspaceId: workspaceId !== undefined ? workspaceId : doc.workspaceId,
     metadata: {
       page_count: doc.page_count,
       entities: doc.entities,
@@ -250,9 +310,14 @@ export async function saveDocument(
 export async function updateDocumentStatus(
   bridgeDocumentId: string,
   status: DocumentStatus,
+  lookup?: DocumentLookupOptions,
 ): Promise<StoredDocument> {
-  return updateDocument(bridgeDocumentId, {
-    status,
-    metadata: { last_accessed_at: Date.now() },
-  });
+  return updateDocument(
+    bridgeDocumentId,
+    {
+      status,
+      metadata: { last_accessed_at: Date.now() },
+    },
+    lookup,
+  );
 }

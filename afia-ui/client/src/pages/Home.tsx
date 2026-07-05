@@ -12,6 +12,8 @@ import { inboxItems } from "@/data/workspace";
 import { patients } from "@/data/patients";
 import type { Patient } from "@/data/types";
 import { filterUserDocuments, listDocuments, type DocumentStatus, type StoredDocument } from "@/lib/documents";
+import { documentStudioHref } from "@/lib/document-navigation";
+import { useTeamWorkspace } from "@/contexts/TeamWorkspaceContext";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { ShareMenu } from "@/components/ShareMenu";
@@ -89,13 +91,14 @@ function relativeTime(ts: number): string {
 export default function Home() {
   const [, setLocation] = useLocation();
   const { openInspector, pushRecent } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspace } = useTeamWorkspace();
 
   const [recentDocs, setRecentDocs] = useState<StoredDocument[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
 
   useEffect(() => {
     let active = true;
-    listDocuments()
+    listDocuments({ workspaceId: activeWorkspaceId })
       .then((docs) => {
         if (active) setRecentDocs(filterUserDocuments(docs).slice(0, 5));
       })
@@ -108,7 +111,7 @@ export default function Home() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [activeWorkspaceId]);
 
   const criticalPatients = patients
     .filter((p: Patient) => p.risk === "critical")
@@ -128,11 +131,19 @@ export default function Home() {
         <div className="flex items-start justify-between gap-4">
           <PageHeader
             title="Welcome back"
-            subtitle={new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}
+            subtitle={
+              activeWorkspace
+                ? `${activeWorkspace.name} · ${new Date().toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                  })}`
+                : new Date().toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                  })
+            }
           />
           <ShareMenu text={HOME_SHARE_TEXT} url={APP_PUBLIC_URL} />
         </div>
@@ -199,7 +210,11 @@ export default function Home() {
                   <button
                     key={doc.id}
                     type="button"
-                    onClick={() => setLocation(`/documents?doc=${doc.id}`)}
+                    onClick={() =>
+                      setLocation(
+                        documentStudioHref(doc, activeWorkspaceId),
+                      )
+                    }
                     className="w-[200px] shrink-0 cursor-pointer rounded-lg border border-hairline bg-surface p-3 text-left transition-colors hover:bg-elevated"
                   >
                     <FileText className="size-5 text-muted-foreground" />

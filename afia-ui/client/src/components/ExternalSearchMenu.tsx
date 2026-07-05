@@ -4,15 +4,20 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { searchPubMed, searchScholar } from "@/lib/external-search";
-import { BookOpen, Globe, GraduationCap } from "lucide-react";
+import { BookOpen, Globe, GraduationCap, Search } from "lucide-react";
 
 export interface ExternalSearchMenuProps {
   query: string;
   /** Called when the menu is opened with an empty query (e.g. focus the input). */
   onEmptyQuery?: () => void;
+  /** When set, menu leads with "Search AFIA" and nests literature under a submenu (top bar). */
+  onSearchAfia?: () => void;
   trigger?: ReactNode;
   align?: "start" | "center" | "end";
 }
@@ -20,6 +25,7 @@ export interface ExternalSearchMenuProps {
 export function ExternalSearchMenu({
   query,
   onEmptyQuery,
+  onSearchAfia,
   trigger,
   align = "end",
 }: ExternalSearchMenuProps) {
@@ -27,7 +33,7 @@ export function ExternalSearchMenu({
   const trimmed = query.trim();
 
   const handleOpenChange = (next: boolean) => {
-    if (next && !trimmed) {
+    if (next && !trimmed && !onSearchAfia) {
       onEmptyQuery?.();
       return;
     }
@@ -35,10 +41,37 @@ export function ExternalSearchMenu({
   };
 
   const runSearch = (search: (q: string) => void) => {
-    if (!trimmed) return;
+    if (!trimmed) {
+      onEmptyQuery?.();
+      return;
+    }
     search(trimmed);
     setOpen(false);
   };
+
+  const handleSearchAfia = () => {
+    onSearchAfia?.();
+    setOpen(false);
+  };
+
+  const literatureItems = (
+    <>
+      <DropdownMenuItem
+        className="cursor-pointer"
+        onClick={() => runSearch(searchPubMed)}
+      >
+        <BookOpen className="size-4" />
+        Search PubMed
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        className="cursor-pointer"
+        onClick={() => runSearch(searchScholar)}
+      >
+        <GraduationCap className="size-4" />
+        Search Google Scholar
+      </DropdownMenuItem>
+    </>
+  );
 
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
@@ -55,20 +88,26 @@ export function ExternalSearchMenu({
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align}>
-        <DropdownMenuItem
-          className="cursor-pointer"
-          onClick={() => runSearch(searchPubMed)}
-        >
-          <BookOpen className="size-4" />
-          Search PubMed
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="cursor-pointer"
-          onClick={() => runSearch(searchScholar)}
-        >
-          <GraduationCap className="size-4" />
-          Search Google Scholar
-        </DropdownMenuItem>
+        {onSearchAfia ? (
+          <>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={handleSearchAfia}
+            >
+              <Search className="size-4" />
+              Search AFIA
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="cursor-pointer">
+                <Globe className="size-4" />
+                Search literature
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>{literatureItems}</DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </>
+        ) : (
+          literatureItems
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

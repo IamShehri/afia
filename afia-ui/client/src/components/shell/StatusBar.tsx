@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { AnalysisModelPicker } from "@/components/document-studio/AnalysisModelPicker";
 import { COLOR_THEME_OPTIONS } from "@/lib/color-themes";
-import { pickDefaultNerModelId, shortModelName } from "@/lib/model-platform";
-import { getActiveModel } from "@/services/model-preference";
-import { getModels, probeBridgeConnection } from "@/services/openmed-client";
+import { probeBridgeConnection } from "@/services/openmed-client";
 import { cn } from "@/lib/utils";
 
 const BRIDGE_POLL_MS = 30_000;
@@ -11,7 +10,6 @@ const BRIDGE_POLL_MS = 30_000;
 export function StatusBar() {
   const { colorTheme } = useTheme();
   const [bridgeOnline, setBridgeOnline] = useState(false);
-  const [modelLabel, setModelLabel] = useState("—");
 
   const themeLabel = useMemo(
     () =>
@@ -37,32 +35,6 @@ export function StatusBar() {
     };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-
-    const resolveModelLabel = async () => {
-      const stored = getActiveModel();
-      if (stored) {
-        if (active) setModelLabel(shortModelName(stored));
-        return;
-      }
-      try {
-        const catalog = await getModels();
-        const fallback = pickDefaultNerModelId(catalog.ner);
-        if (active) {
-          setModelLabel(fallback ? shortModelName(fallback) : "—");
-        }
-      } catch {
-        if (active) setModelLabel("—");
-      }
-    };
-
-    void resolveModelLabel();
-    return () => {
-      active = false;
-    };
-  }, []);
-
   return (
     <div className="flex h-7 items-center gap-4 border-t border-hairline bg-surface px-4 text-[11px] text-muted-foreground">
       <div className="flex min-w-0 items-center gap-1.5">
@@ -81,9 +53,7 @@ export function StatusBar() {
       </div>
 
       <div className="flex min-w-0 shrink-0 items-center gap-2 truncate">
-        <span className="truncate" title={modelLabel}>
-          {modelLabel}
-        </span>
+        <AnalysisModelPicker variant="status" />
         <span className="text-hairline-strong">·</span>
         <span className="truncate">{themeLabel}</span>
       </div>
