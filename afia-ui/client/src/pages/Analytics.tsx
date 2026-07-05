@@ -1,0 +1,278 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader, SectionLabel } from "@/components/primitives";
+import { TopEntitiesBar } from "@/components/charts/TopEntitiesBar";
+import { LibraryConfidenceChart } from "@/components/charts/LibraryConfidenceChart";
+import { DocumentComparisonPanel } from "@/components/analytics/DocumentComparison";
+import { logAction } from "@/lib/audit";
+import { loadLibrarySummaries } from "@/lib/analytics-loader";
+import {
+  computeConfidenceByDocument,
+  computeLibraryOverview,
+  computeTopEntities,
+  LIBRARY_ANALYTICS_CAP,
+  type AnalyzedDocSummary,
+} from "@/lib/analytics-library";
+import {
+  BarChart3,
+  FileText,
+  Layers,
+  Loader2,
+  RefreshCw,
+  Tags,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: string | number;
+  icon: LucideIcon;
+}) {
+  return (
+    <Card>
+      <CardContent>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              {label}
+            </div>
+            <div className="mt-1 text-2xl font-semibold">{value}</div>
+          </div>
+          <Icon className="size-4 shrink-0 text-muted-foreground" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function Analytics() {
+  const [, setLocation] = useLocation();
+  const auditedRef = useRef(false);
+
+  const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState({ loaded: 0, total: 0 });
+  const [analyzedDocs, setAnalyzedDocs] = useState<AnalyzedDocSummary[]>([]);
+  const [skippedUnanalyzed, setSkippedUnanalyzed] = useState(0);
+  const [truncated, setTruncated] = useState(false);
+  const [totalInLibrary, setTotalInLibrary] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [docAId, setDocAId] = useState("");
+  const [docBId, setDocBId] = useState("");
+
+  const runLoad = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    setProgress({ loaded: 0, total: 0 });
+    setAnalyzedDocs([]);
+    setSkippedUnanalyzed(0);
+    setDocAId("");
+    setDocBId("");
+    try {
+      const result = await loadLibrarySummaries({
+        onProgress: (loaded, total) => {
+          setProgress({ loaded, total });
+        },
+        onPartial: ({ analyzed, skippedUnanalyzed: skipped }) => {
+          setAnalyzedDocs(analyzed);
+          setSkippedUnanalyzed(skipped);
+        },
+      });
+      setAnalyzedDocs(result.analyzed);
+      setSkippedUnanalyzed(result.skippedUnanalyzed);
+      setTruncated(result.truncated);
+      setTotalInLibrary(result.totalInLibrary);
+      if (result.analyzed.length >= 2) {
+        setDocAId(result.analyzed[0].id);
+        setDocBId(result.analyzed[1].id);
+      }
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Failed to load library");
+      setAnalyzedDocs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!auditedRef.current) {
+      auditedRef.current = true;
+      logAction("view", "analysis");
+    }
+    void runLoad();
+  }, [runLoad]);
+
+  const overview = useMemo(
+    () => computeLibraryOverview(analyzedDocs),
+    [analyzedDocs],
+  );
+  const topEntities = useMemo(
+    () => computeTopEntities(analyzedDocs, 15),
+    [analyzedDocs],
+  );
+  const confidenceByDoc = useMemo(
+    () => computeConfidenceByDocument(analyzedDocs),
+    [analyzedDocs],
+  );
+
+  const showEmpty = !loading && analyzedDocs.length < 2;
+
+  return (
+    <div className="flex h-full flex-col bg-background">
+      <div className="border-b border-hairline px-6 py-4">
+        <div className="flex items-start justify-between gap-4">
+          <PageHeader
+            title="Analytics Lab"
+            subtitle="Cross-document intelligence across your analyzed library"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={loading}
+            onClick={() => void runLoad()}
+            className="shrink-0"
+          >
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto p-6">
+        <div className="mx-auto max-w-7xl space-y-6">
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Analyzing library… {progress.loaded}/{progress.total || "…"}{" "}
+              documents
+            </div>
+          )}
+
+          {loadError && (
+            <p className="text-sm text-destructive">{loadError}</p>
+          )}
+
+          {!loading && truncated && (
+            <p className="rounded-md border border-hairline bg-surface px-3 py-2 text-sm text-muted-foreground">
+              Showing analytics for the {LIBRARY_ANALYTICS_CAP} most recent
+              documents
+              {totalInLibrary > LIBRARY_ANALYTICS_CAP
+                ? ` (${totalInLibrary} in your library).`
+                : "."}
+            </p>
+          )}
+
+          {skippedUnanalyzed > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {skippedUnanalyzed} document
+              {skippedUnanalyzed === 1 ? "" : "s"} not yet analyzed —{" "}
+              <button
+                type="button"
+                onClick={() => setLocation("/research")}
+                className="font-medium text-primary hover:underline"
+              >
+                analyze them
+              </button>{" "}
+              to include.
+            </p>
+          )}
+
+          {showEmpty ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <BarChart3 className="mx-auto size-10 text-muted-foreground/60" />
+                <p className="mt-4 text-sm font-medium">
+                  Analytics needs at least 2 analyzed documents
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Upload and analyze PDFs in Document Studio to unlock
+                  cross-document insights.
+                </p>
+                <Button
+                  className="mt-4"
+                  onClick={() => setLocation("/documents")}
+                >
+                  <FileText className="size-4" />
+                  Open Document Studio
+                </Button>
+              </CardContent>
+            </Card>
+          ) : analyzedDocs.length >= 2 ? (
+            <>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <StatCard
+                  label="Analyzed docs"
+                  value={overview.documentCount}
+                  icon={FileText}
+                />
+                <StatCard
+                  label="Total entities"
+                  value={overview.totalEntities.toLocaleString()}
+                  icon={Tags}
+                />
+                <StatCard
+                  label="Avg confidence"
+                  value={`${(overview.avgConfidence * 100).toFixed(0)}%`}
+                  icon={TrendingUp}
+                />
+                <StatCard
+                  label="Top label"
+                  value={overview.topLabel ?? "—"}
+                  icon={Layers}
+                />
+              </div>
+
+              <Card>
+                <CardContent>
+                  <SectionLabel>Top entities across your library</SectionLabel>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Most frequent entity texts (case-insensitive), colored by
+                    label
+                  </p>
+                  <div className="mt-4">
+                    <TopEntitiesBar rows={topEntities} />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent>
+                  <DocumentComparisonPanel
+                    docs={analyzedDocs}
+                    docAId={docAId}
+                    docBId={docBId}
+                    onDocAChange={setDocAId}
+                    onDocBChange={setDocBId}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent>
+                  <SectionLabel>Confidence by document</SectionLabel>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Average entity confidence per document — weakest analyses
+                    first
+                  </p>
+                  <div className="mt-4">
+                    <LibraryConfidenceChart rows={confidenceByDoc} />
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}

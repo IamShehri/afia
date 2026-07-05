@@ -10,6 +10,7 @@ import {
   Layers,
   GitCompare,
   ShieldOff,
+  BarChart3,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -28,6 +29,7 @@ export const primaryNav: NavItem[] = [
   { id: "schedule", label: "Schedule", href: "/schedule", icon: CalendarDays, shortcut: "G S" },
   { id: "inbox", label: "Inbox", href: "/inbox", icon: Inbox, shortcut: "G I" },
   { id: "documents", label: "Documents", href: "/documents", icon: FileText, shortcut: "G D" },
+  { id: "analytics", label: "Analytics Lab", href: "/analytics", icon: BarChart3 },
   { id: "research", label: "My Research", href: "/research", icon: ClipboardList, shortcut: "G R" },
   { id: "batch", label: "Batch Process", href: "/batch", icon: Layers, shortcut: "G B" },
   { id: "compare", label: "Compare Models", href: "/compare", icon: GitCompare, shortcut: "G C" },
