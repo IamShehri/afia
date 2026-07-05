@@ -199,3 +199,188 @@ export function compareDocuments(
     onlyB: onlyB.sort(byText),
   };
 }
+
+export interface CooccurrenceEntity {
+  id: string;
+  label: string;
+  type: string;
+  docFrequency: number;
+}
+
+export interface CooccurrenceMatrix {
+  entities: CooccurrenceEntity[];
+  /** Symmetric values — diagonal holds document frequency. */
+  values: number[][];
+  /** Document ids for off-diagonal pair, keyed by normalized `a|b`. */
+  pairDocIds: Record<string, string[]>;
+}
+
+export interface EntityStatRow {
+  id: string;
+  entity: string;
+  label: string;
+  documentCount: number;
+  totalMentions: number;
+  avgConfidence: number;
+  /** Share of analyzed library documents containing this entity (0–100). */
+  libraryPercent: number;
+}
+
+interface EntityAggregate {
+  id: string;
+  label: string;
+  typeCounts: Map<string, number>;
+  docIds: Set<string>;
+  mentionCount: number;
+  confidenceSum: number;
+}
+
+function buildEntityAggregates(
+  docs: AnalyzedDocSummary[],
+): Map<string, EntityAggregate> {
+  const aggregates = new Map<string, EntityAggregate>();
+
+  for (const doc of docs) {
+    const seenInDoc = new Set<string>();
+    for (const entity of doc.entities) {
+      const text = entity.text.trim();
+      if (!text) continue;
+      const id = normalizeText(text);
+      let agg = aggregates.get(id);
+      if (!agg) {
+        agg = {
+          id,
+          label: text,
+          typeCounts: new Map([[entity.label, 1]]),
+          docIds: new Set<string>(),
+          mentionCount: 0,
+          confidenceSum: 0,
+        };
+        aggregates.set(id, agg);
+      } else {
+        agg.typeCounts.set(
+          entity.label,
+          (agg.typeCounts.get(entity.label) ?? 0) + 1,
+        );
+        if (text.length > agg.label.length) {
+          agg.label = text;
+        }
+      }
+      agg.mentionCount += 1;
+      agg.confidenceSum += entity.confidence ?? 0;
+      seenInDoc.add(id);
+    }
+    for (const id of seenInDoc) {
+      aggregates.get(id)?.docIds.add(doc.id);
+    }
+  }
+
+  return aggregates;
+}
+
+function dominantLabel(typeCounts: Map<string, number>): string {
+  let label = "UNKNOWN";
+  let max = 0;
+  for (const [type, count] of typeCounts) {
+    if (count > max) {
+      label = type;
+      max = count;
+    }
+  }
+  return label;
+}
+
+function pairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+export function computeCooccurrenceMatrix(
+  docs: AnalyzedDocSummary[],
+  topN = 12,
+): CooccurrenceMatrix | null {
+  if (docs.length < 2) return null;
+
+  const aggregates = buildEntityAggregates(docs);
+  const ranked = [...aggregates.values()]
+    .sort((a, b) => b.docIds.size - a.docIds.size)
+    .slice(0, topN);
+
+  if (ranked.length < 2) return null;
+
+  const entities: CooccurrenceEntity[] = ranked.map((agg) => ({
+    id: agg.id,
+    label: agg.label,
+    type: dominantLabel(agg.typeCounts),
+    docFrequency: agg.docIds.size,
+  }));
+
+  const indexById = new Map(entities.map((entity, index) => [entity.id, index]));
+  const size = entities.length;
+  const values = Array.from({ length: size }, () => Array(size).fill(0));
+  const pairDocIds: Record<string, string[]> = {};
+
+  for (let i = 0; i < size; i += 1) {
+    values[i]![i] = entities[i]!.docFrequency;
+  }
+
+  for (const doc of docs) {
+    const keys = [
+      ...new Set(
+        doc.entities
+          .map((entity) => normalizeText(entity.text.trim()))
+          .filter((key) => indexById.has(key)),
+      ),
+    ];
+
+    for (let i = 0; i < keys.length; i += 1) {
+      for (let j = i + 1; j < keys.length; j += 1) {
+        const a = keys[i]!;
+        const b = keys[j]!;
+        const row = indexById.get(a)!;
+        const col = indexById.get(b)!;
+        values[row]![col] += 1;
+        values[col]![row] += 1;
+
+        const key = pairKey(a, b);
+        if (!pairDocIds[key]) pairDocIds[key] = [];
+        pairDocIds[key].push(doc.id);
+      }
+    }
+  }
+
+  return { entities, values, pairDocIds };
+}
+
+export function computeEntityStatistics(
+  docs: AnalyzedDocSummary[],
+): EntityStatRow[] {
+  if (docs.length === 0) return [];
+
+  const aggregates = buildEntityAggregates(docs);
+  const librarySize = docs.length;
+
+  return [...aggregates.values()]
+    .map((agg) => ({
+      id: agg.id,
+      entity: agg.label,
+      label: dominantLabel(agg.typeCounts),
+      documentCount: agg.docIds.size,
+      totalMentions: agg.mentionCount,
+      avgConfidence:
+        agg.mentionCount > 0 ? agg.confidenceSum / agg.mentionCount : 0,
+      libraryPercent: (agg.docIds.size / librarySize) * 100,
+    }))
+    .sort((a, b) => b.documentCount - a.documentCount);
+}
+
+export function getCooccurrencePairDocs(
+  matrix: CooccurrenceMatrix,
+  row: number,
+  col: number,
+): string[] {
+  if (row === col) return [];
+  const a = matrix.entities[row]?.id;
+  const b = matrix.entities[col]?.id;
+  if (!a || !b) return [];
+  return matrix.pairDocIds[pairKey(a, b)] ?? [];
+}

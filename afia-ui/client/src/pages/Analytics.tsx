@@ -2,10 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader, SectionLabel } from "@/components/primitives";
 import { TopEntitiesBar } from "@/components/charts/TopEntitiesBar";
 import { LibraryConfidenceChart } from "@/components/charts/LibraryConfidenceChart";
 import { DocumentComparisonPanel } from "@/components/analytics/DocumentComparison";
+import { EntityGraphPanel } from "@/components/analytics/EntityGraphPanel";
+import { CooccurrenceMatrixPanel } from "@/components/analytics/CooccurrenceMatrix";
+import { EntityStatisticsTable } from "@/components/analytics/EntityStatisticsTable";
 import { logAction } from "@/lib/audit";
 import { loadLibrarySummaries } from "@/lib/analytics-loader";
 import {
@@ -20,7 +24,9 @@ import {
   FileText,
   Layers,
   Loader2,
+  Network,
   RefreshCw,
+  Table2,
   Tags,
   TrendingUp,
   type LucideIcon,
@@ -129,7 +135,7 @@ export default function Analytics() {
         <div className="flex items-start justify-between gap-4">
           <PageHeader
             title="Analytics Lab"
-            subtitle="Cross-document intelligence across your analyzed library"
+            subtitle="Cross-document intelligence and research workbench"
           />
           <Button
             variant="outline"
@@ -208,7 +214,20 @@ export default function Analytics() {
               </CardContent>
             </Card>
           ) : analyzedDocs.length >= 2 ? (
-            <>
+            <Tabs defaultValue="overview" className="space-y-6">
+              <TabsList>
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="graph">
+                  <Network className="size-4" />
+                  Entity Graph
+                </TabsTrigger>
+                <TabsTrigger value="workbench">
+                  <Table2 className="size-4" />
+                  Workbench
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="overview" className="space-y-6">
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <StatCard
                   label="Analyzed docs"
@@ -269,7 +288,50 @@ export default function Analytics() {
                   </div>
                 </CardContent>
               </Card>
-            </>
+              </TabsContent>
+
+              <TabsContent value="graph">
+                <Card>
+                  <CardContent>
+                    <SectionLabel>Entity graph</SectionLabel>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Co-occurrence network across your analyzed library — drag
+                      to pin, double-click to unpin, right-click to hide
+                    </p>
+                    <div className="mt-4">
+                      <EntityGraphPanel analyzedDocs={analyzedDocs} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="workbench" className="space-y-6">
+                <Card>
+                  <CardContent>
+                    <SectionLabel>Co-occurrence matrix</SectionLabel>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Top entities by document frequency — diagonal shows doc
+                      count, off-diagonal shows shared-document co-occurrence
+                    </p>
+                    <div className="mt-4">
+                      <CooccurrenceMatrixPanel docs={analyzedDocs} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent>
+                    <SectionLabel>Entity statistics</SectionLabel>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Sortable library-wide entity metrics with CSV export
+                    </p>
+                    <div className="mt-4">
+                      <EntityStatisticsTable docs={analyzedDocs} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           ) : null}
         </div>
       </div>

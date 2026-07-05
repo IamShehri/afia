@@ -1,4 +1,4 @@
-import { getDocument, listDocuments } from "@/lib/documents";
+import { filterUserDocuments, getDocument, listDocuments } from "@/lib/documents";
 import {
   LIBRARY_ANALYTICS_CAP,
   type AnalyzedDocSummary,
@@ -23,7 +23,7 @@ export async function loadLibrarySummaries(
     }) => void;
   },
 ): Promise<LibraryLoadResult> {
-  const index = await listDocuments();
+  const index = filterUserDocuments(await listDocuments());
   const totalInLibrary = index.length;
   const truncated = totalInLibrary > LIBRARY_ANALYTICS_CAP;
   const scanBatch = index.slice(0, LIBRARY_ANALYTICS_CAP);

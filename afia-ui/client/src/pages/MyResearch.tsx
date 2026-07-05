@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/primitives";
 import { cn } from "@/lib/utils";
 import {
+  filterUserDocuments,
   listDocuments,
   type StoredDocument,
   type DocumentStatus,
@@ -17,19 +18,20 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-const STATUS_STYLES: Record<DocumentStatus, string> = {
+const STATUS_STYLES: Record<UserDocumentStatus, string> = {
   new: "border-info/25 bg-info/10 text-info",
   in_progress: "border-warning/25 bg-warning/10 text-warning",
   reviewed: "border-success/25 bg-success/10 text-success",
 };
 
-const STATUS_LABELS: Record<DocumentStatus, string> = {
+const STATUS_LABELS: Record<UserDocumentStatus, string> = {
   new: "New",
   in_progress: "In Progress",
   reviewed: "Reviewed",
 };
 
-type StatusFilter = "all" | DocumentStatus;
+type UserDocumentStatus = Exclude<DocumentStatus, "artifact">;
+type StatusFilter = "all" | UserDocumentStatus;
 
 const FILTERS: { id: StatusFilter; label: string }[] = [
   { id: "all", label: "All" },
@@ -98,7 +100,7 @@ export default function MyResearch() {
     let active = true;
     listDocuments()
       .then((docs) => {
-        if (active) setAllDocs(docs);
+        if (active) setAllDocs(filterUserDocuments(docs));
       })
       .catch(() => {
         if (active) setAllDocs([]);
@@ -191,7 +193,7 @@ export default function MyResearch() {
         ) : (
           <div className="rounded-lg border border-hairline">
             {filtered.map((doc) => {
-              const status = doc.status ?? "new";
+              const status = (doc.status ?? "new") as UserDocumentStatus;
               return (
                 <button
                   key={doc.id}

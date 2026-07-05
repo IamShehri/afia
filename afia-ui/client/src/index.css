@@ -41,6 +41,9 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -65,8 +68,10 @@
 
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
+  --color-warning: var(--clinical-warning);
+  --color-warning-foreground: var(--clinical-warning-foreground);
+  --color-danger: var(--clinical-danger);
+  --color-danger-foreground: var(--clinical-danger-foreground);
   --color-info: var(--info);
   --color-risk-high: var(--risk-high);
 
@@ -80,6 +85,25 @@
 :root {
   --radius: 0.625rem;
 
+  /* Clinical semantics — constant across all color themes (never overridden) */
+  --clinical-warning: oklch(0.72 0.15 70);
+  --clinical-warning-foreground: oklch(0.25 0.04 70);
+  --clinical-danger: oklch(0.585 0.215 18);
+  --clinical-danger-foreground: oklch(0.99 0 0);
+
+  --warning: var(--clinical-warning);
+  --warning-foreground: var(--clinical-warning-foreground);
+  --destructive: var(--clinical-danger);
+  --destructive-foreground: var(--clinical-danger-foreground);
+  --risk-high: oklch(0.7 0.18 40);
+}
+
+/* =============================================================================
+   Classic theme (default) — Graphite Atelier
+   ============================================================================= */
+
+:root,
+[data-theme="classic"] {
   /* ---- Light mode: warm white, stone surfaces, soft shadows ---- */
   --background: oklch(0.985 0.004 80);
   --foreground: oklch(0.255 0.012 65);
@@ -104,14 +128,9 @@
   --accent: oklch(0.945 0.006 250);
   --accent-foreground: oklch(0.3 0.03 252);
 
-  --destructive: oklch(0.585 0.215 18);
-  --destructive-foreground: oklch(0.99 0 0);
   --success: oklch(0.62 0.14 158);
   --success-foreground: oklch(0.99 0 0);
-  --warning: oklch(0.72 0.15 70);
-  --warning-foreground: oklch(0.25 0.04 70);
   --info: oklch(0.6 0.13 232);
-  --risk-high: oklch(0.7 0.18 40);
 
   --ai: oklch(0.52 0.18 285);
   --ai-foreground: oklch(0.99 0.005 285);
@@ -128,6 +147,9 @@
   --chart-3: oklch(0.62 0.14 158);
   --chart-4: oklch(0.72 0.15 70);
   --chart-5: oklch(0.6 0.13 210);
+  --chart-6: oklch(0.58 0.12 300);
+  --chart-7: oklch(0.65 0.1 40);
+  --chart-8: oklch(0.5 0.08 200);
 
   --sidebar: oklch(0.965 0.005 80);
   --sidebar-foreground: oklch(0.35 0.012 65);
@@ -139,7 +161,8 @@
   --sidebar-ring: oklch(0.55 0.17 252);
 }
 
-.dark {
+:root.dark,
+[data-theme="classic"].dark {
   /* ---- Dark mode (primary): warm graphite, never OLED-black ---- */
   --background: oklch(0.178 0.006 60);
   --foreground: oklch(0.9 0.006 70);
@@ -164,14 +187,9 @@
   --accent: oklch(0.3 0.02 256);
   --accent-foreground: oklch(0.92 0.02 256);
 
-  --destructive: oklch(0.66 0.2 19);
-  --destructive-foreground: oklch(0.99 0 0);
   --success: oklch(0.72 0.15 160);
   --success-foreground: oklch(0.16 0.02 160);
-  --warning: oklch(0.8 0.14 75);
-  --warning-foreground: oklch(0.22 0.04 75);
   --info: oklch(0.7 0.12 232);
-  --risk-high: oklch(0.7 0.18 40);
 
   --ai: oklch(0.68 0.16 288);
   --ai-foreground: oklch(0.16 0.02 288);
@@ -188,6 +206,9 @@
   --chart-3: oklch(0.72 0.15 160);
   --chart-4: oklch(0.8 0.14 75);
   --chart-5: oklch(0.7 0.12 210);
+  --chart-6: oklch(0.68 0.12 300);
+  --chart-7: oklch(0.72 0.1 40);
+  --chart-8: oklch(0.62 0.08 200);
 
   --sidebar: oklch(0.16 0.006 60);
   --sidebar-foreground: oklch(0.82 0.006 70);
@@ -197,6 +218,122 @@
   --sidebar-accent-foreground: oklch(0.92 0.006 70);
   --sidebar-border: oklch(1 0 0 / 7%);
   --sidebar-ring: oklch(0.66 0.17 256);
+}
+
+/* =============================================================================
+   Coral theme — warm research palette
+   ============================================================================= */
+
+[data-theme="coral"] {
+  --background: #faf6f0;
+  --foreground: #22304a;
+  --surface: #f5f0e8;
+  --surface-foreground: #22304a;
+  --elevated: #ffffff;
+  --rail: #f0ebe3;
+
+  --card: #ffffff;
+  --card-foreground: #22304a;
+  --popover: #ffffff;
+  --popover-foreground: #22304a;
+
+  --primary: #ff7355;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f0ebe3;
+  --secondary-foreground: #22304a;
+  --muted: #f0ebe3;
+  --muted-foreground: #5a6478;
+  --accent: #fff0eb;
+  --accent-foreground: #22304a;
+
+  --success: #7a9e7e;
+  --success-foreground: #ffffff;
+  --info: #5a7a8a;
+
+  --ai: #22304a;
+  --ai-foreground: #faf6f0;
+  --ai-soft: #eef1f5;
+
+  --border: #22304a14;
+  --hairline: #22304a12;
+  --hairline-strong: #22304a22;
+  --input: #22304a18;
+  --ring: #ff7355;
+
+  --chart-1: #ff7355;
+  --chart-2: #22304a;
+  --chart-3: #7a9e7e;
+  --chart-4: #d9a441;
+  --chart-5: #ff9b85;
+  --chart-6: #5a7a8a;
+  --chart-7: #9bb89e;
+  --chart-8: #e8c872;
+
+  --sidebar: #f0ebe3;
+  --sidebar-foreground: #22304a;
+  --sidebar-primary: #ff7355;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fff0eb;
+  --sidebar-accent-foreground: #22304a;
+  --sidebar-border: #22304a12;
+  --sidebar-ring: #ff7355;
+}
+
+[data-theme="coral"].dark {
+  --background: #141c2b;
+  --foreground: #faf6f0;
+  --surface: #1a2435;
+  --surface-foreground: #f0ebe3;
+  --elevated: #22304a;
+  --rail: #101722;
+
+  --card: #1a2435;
+  --card-foreground: #faf6f0;
+  --popover: #22304a;
+  --popover-foreground: #faf6f0;
+
+  --primary: #ff7355;
+  --primary-foreground: #141c2b;
+
+  --secondary: #22304a;
+  --secondary-foreground: #e8e4dc;
+  --muted: #22304a;
+  --muted-foreground: #a8b0bc;
+  --accent: #2a3548;
+  --accent-foreground: #faf6f0;
+
+  --success: #7a9e7e;
+  --success-foreground: #141c2b;
+  --info: #7a9eb0;
+
+  --ai: #ff9b85;
+  --ai-foreground: #141c2b;
+  --ai-soft: #2a3548;
+
+  --border: #faf6f014;
+  --hairline: #faf6f012;
+  --hairline-strong: #faf6f024;
+  --input: #faf6f018;
+  --ring: #ff7355;
+
+  --chart-1: #ff7355;
+  --chart-2: #ff9b85;
+  --chart-3: #7a9e7e;
+  --chart-4: #d9a441;
+  --chart-5: #e8c872;
+  --chart-6: #5a7a8a;
+  --chart-7: #9bb89e;
+  --chart-8: #faf6f0;
+
+  --sidebar: #101722;
+  --sidebar-foreground: #e8e4dc;
+  --sidebar-primary: #ff7355;
+  --sidebar-primary-foreground: #141c2b;
+  --sidebar-accent: #1a2435;
+  --sidebar-accent-foreground: #faf6f0;
+  --sidebar-border: #faf6f012;
+  --sidebar-ring: #ff7355;
 }
 
 @layer base {

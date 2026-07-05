@@ -1,10 +1,13 @@
-/** Stable label colors — chart-2 matches the primary entity badge (ai) tone. */
+/** Stable label colors — 8-color chart rotation. */
 const ENTITY_LABEL_PALETTE = [
-  "var(--color-chart-2)",
   "var(--color-chart-1)",
+  "var(--color-chart-2)",
   "var(--color-chart-3)",
-  "var(--color-chart-5)",
   "var(--color-chart-4)",
+  "var(--color-chart-5)",
+  "var(--color-chart-6)",
+  "var(--color-chart-7)",
+  "var(--color-chart-8)",
 ] as const;
 
 export function buildEntityLabelColorMap(labels: string[]): Map<string, string> {

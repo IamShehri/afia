@@ -1,16 +1,14 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { currentUser } from "@/data/clinicians";
 import { Monogram, PageHeader } from "@/components/primitives";
+import { ColorThemePicker } from "@/components/settings/ColorThemePicker";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Settings as SettingsIcon } from "lucide-react";
 
 export default function Settings() {
-  const { theme, toggleTheme, switchable } = useTheme();
+  const { colorMode, toggleColorMode, switchable } = useTheme();
   const [notifications, setNotifications] = useState(true);
 
   return (
@@ -39,7 +37,16 @@ export default function Settings() {
           </div>
           <div>
             <h2 className="text-lg font-semibold mb-4">Preferences</h2>
-            <div className="space-y-3">
+            <div className="space-y-6">
+              <div>
+                <Label className="text-sm font-medium">Color palette</Label>
+                <p className="mt-1 mb-3 text-xs text-muted-foreground">
+                  Choose a research palette. Clinical warning and danger colors
+                  stay consistent across palettes.
+                </p>
+                <ColorThemePicker />
+              </div>
+
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <Label htmlFor="notifications">Notifications</Label>
@@ -55,17 +62,17 @@ export default function Settings() {
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <Label htmlFor="theme">Theme</Label>
+                  <Label htmlFor="color-mode">Appearance</Label>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {theme === "dark"
+                    {colorMode === "dark"
                       ? "Dark mode is currently enabled"
                       : "Light mode is currently enabled"}
                   </p>
                 </div>
                 <Switch
-                  id="theme"
-                  checked={theme === "dark"}
-                  onCheckedChange={() => toggleTheme?.()}
+                  id="color-mode"
+                  checked={colorMode === "dark"}
+                  onCheckedChange={() => toggleColorMode?.()}
                   disabled={!switchable}
                 />
               </div>

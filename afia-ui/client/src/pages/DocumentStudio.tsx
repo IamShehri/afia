@@ -84,7 +84,10 @@ interface QaEntry {
   sources: DocumentSource[];
 }
 
-const STATUS_STYLES: Record<DocumentStatus, string> = {
+const STATUS_STYLES: Record<
+  Exclude<DocumentStatus, "artifact">,
+  string
+> = {
   new: "border-info/25 bg-info/10 text-info",
   in_progress: "border-warning/25 bg-warning/10 text-warning",
   reviewed: "border-success/25 bg-success/10 text-success",
@@ -769,7 +772,7 @@ export default function DocumentStudio() {
                       aria-label="Review status"
                       className={cn(
                         "rounded-md border px-1.5 py-0.5 text-xs font-medium",
-                        STATUS_STYLES[status],
+                        STATUS_STYLES[status as Exclude<DocumentStatus, "artifact">],
                       )}
                     >
                       <option value="new">New</option>

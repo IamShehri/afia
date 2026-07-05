@@ -1,6 +1,20 @@
 import { supabase } from "@/lib/supabase";
 
-export type DocumentStatus = "new" | "in_progress" | "reviewed";
+export type DocumentStatus = "new" | "in_progress" | "reviewed" | "artifact";
+
+export const LIBRARY_GRAPH_ARTIFACT_ID = "afia-artifact-library-graph";
+export const LIBRARY_GRAPH_ARTIFACT_TITLE = "Library Entity Graph";
+
+export function isArtifactDocument(doc: Pick<StoredDocument, "status">): boolean {
+  return doc.status === "artifact";
+}
+
+/** User-visible library rows — excludes synthetic artifact documents. */
+export function filterUserDocuments<T extends Pick<StoredDocument, "status">>(
+  docs: T[],
+): T[] {
+  return docs.filter((d) => !isArtifactDocument(d));
+}
 
 export interface DocumentEntity {
   text: string;
@@ -17,6 +31,27 @@ export interface DocumentQaEntry {
   sources: Array<{ text: string; score: number; start: number; end: number }>;
 }
 
+export interface GraphElement {
+  id: string;
+  label: string;
+  type: string;
+  pinned?: boolean;
+  x?: number;
+  y?: number;
+  hidden?: boolean;
+}
+
+export interface GraphConnection {
+  from: string;
+  to: string;
+  weight: number;
+}
+
+export interface LibraryGraphSpec {
+  elements: GraphElement[];
+  connections: GraphConnection[];
+}
+
 export interface DocumentMetadata {
   page_count?: number;
   entities?: DocumentEntity[];
@@ -24,6 +59,8 @@ export interface DocumentMetadata {
   model_used?: string;
   uploaded_at?: number;
   last_accessed_at?: number;
+  /** Persisted entity graph layout (Analytics Lab artifact). */
+  graph_spec?: LibraryGraphSpec;
 }
 
 /** UI-facing document shape — `id` is the bridge digest for ?doc= URLs. */
@@ -39,6 +76,7 @@ export interface StoredDocument {
   modelUsed?: string;
   uploadedAt: number;
   lastAccessedAt: number;
+  metadata?: DocumentMetadata;
 }
 
 export interface CreateDocumentOptions {
@@ -67,7 +105,9 @@ interface CryptoDocument {
 }
 
 function parseStatus(value: string | null | undefined): DocumentStatus {
-  if (value === "in_progress" || value === "reviewed") return value;
+  if (value === "in_progress" || value === "reviewed" || value === "artifact") {
+    return value;
+  }
   return "new";
 }
 
@@ -87,6 +127,7 @@ function cryptoDocToStored(doc: CryptoDocument): StoredDocument {
       meta.uploaded_at ?? new Date(doc.created_at).getTime(),
     lastAccessedAt:
       meta.last_accessed_at ?? new Date(doc.updated_at).getTime(),
+    metadata: meta,
   };
 }
 

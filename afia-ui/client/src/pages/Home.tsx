@@ -11,7 +11,7 @@ import {
 import { inboxItems } from "@/data/workspace";
 import { patients } from "@/data/patients";
 import type { Patient } from "@/data/types";
-import { listDocuments, type StoredDocument } from "@/lib/documents";
+import { filterUserDocuments, listDocuments, type StoredDocument } from "@/lib/documents";
 import { useLocation } from "wouter";
 import { ShareMenu } from "@/components/ShareMenu";
 import { APP_PUBLIC_URL } from "@/const";
@@ -82,7 +82,7 @@ export default function Home() {
     let active = true;
     listDocuments()
       .then((docs) => {
-        if (active) setRecentDocs(docs.slice(0, 5));
+        if (active) setRecentDocs(filterUserDocuments(docs).slice(0, 5));
       })
       .catch(() => {
         if (active) setRecentDocs([]);

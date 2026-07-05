@@ -1,55 +1,107 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import {
+  COLOR_THEME_STORAGE_KEY,
+  type ColorTheme,
+} from "@/lib/color-themes";
 
-type Theme = "light" | "dark";
+export type ColorMode = "light" | "dark";
 
 interface ThemeContextType {
-  theme: Theme;
-  toggleTheme?: () => void;
+  /** Light / dark appearance */
+  colorMode: ColorMode;
+  /** Classic vs coral palette */
+  colorTheme: ColorTheme;
+  setColorTheme: (theme: ColorTheme) => void;
+  toggleColorMode?: () => void;
   switchable: boolean;
+  /** @deprecated Use colorMode — kept for existing callers */
+  theme: ColorMode;
+  /** @deprecated Use toggleColorMode */
+  toggleTheme?: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+const COLOR_MODE_KEY = "theme";
+
 interface ThemeProviderProps {
   children: React.ReactNode;
-  defaultTheme?: Theme;
+  defaultTheme?: ColorMode;
+  defaultColorTheme?: ColorTheme;
   switchable?: boolean;
+}
+
+function readStoredColorMode(defaultTheme: ColorMode): ColorMode {
+  const stored = localStorage.getItem(COLOR_MODE_KEY);
+  if (stored === "light" || stored === "dark") return stored;
+  return defaultTheme;
+}
+
+function readStoredColorTheme(defaultColorTheme: ColorTheme): ColorTheme {
+  const stored = localStorage.getItem(COLOR_THEME_STORAGE_KEY);
+  if (stored === "classic" || stored === "coral") return stored;
+  return defaultColorTheme;
 }
 
 export function ThemeProvider({
   children,
   defaultTheme = "dark",
+  defaultColorTheme = "classic",
   switchable = false,
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (switchable) {
-      const stored = localStorage.getItem("theme");
-      return (stored as Theme) || defaultTheme;
-    }
-    return defaultTheme;
-  });
+  const [colorMode, setColorMode] = useState<ColorMode>(() =>
+    switchable ? readStoredColorMode(defaultTheme) : defaultTheme,
+  );
+  const [colorTheme, setColorThemeState] = useState<ColorTheme>(() =>
+    switchable
+      ? readStoredColorTheme(defaultColorTheme)
+      : defaultColorTheme,
+  );
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === "dark") {
+    root.setAttribute("data-theme", colorTheme);
+
+    if (colorMode === "dark") {
       root.classList.add("dark");
     } else {
       root.classList.remove("dark");
     }
 
     if (switchable) {
-      localStorage.setItem("theme", theme);
+      localStorage.setItem(COLOR_MODE_KEY, colorMode);
+      localStorage.setItem(COLOR_THEME_STORAGE_KEY, colorTheme);
     }
-  }, [theme, switchable]);
+  }, [colorMode, colorTheme, switchable]);
 
-  const toggleTheme = switchable
-    ? () => {
-        setTheme(prev => (prev === "light" ? "dark" : "light"));
-      }
-    : undefined;
+  const toggleColorMode = useCallback(() => {
+    setColorMode((prev) => (prev === "light" ? "dark" : "light"));
+  }, []);
+
+  const setColorTheme = useCallback((theme: ColorTheme) => {
+    setColorThemeState(theme);
+  }, []);
+
+  const toggleTheme = switchable ? toggleColorMode : undefined;
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, switchable }}>
+    <ThemeContext.Provider
+      value={{
+        colorMode,
+        colorTheme,
+        setColorTheme,
+        toggleColorMode: switchable ? toggleColorMode : undefined,
+        switchable,
+        theme: colorMode,
+        toggleTheme,
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );
