@@ -572,5 +572,38 @@ def ask_document(req: AskDocumentRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class ExportFhirEntity(BaseModel):
+    text: str
+    label: str
+    confidence: float = 0.0
+    start: int = 0
+    end: int = 0
+
+class ExportFhirDocMeta(BaseModel):
+    title: Optional[str] = None
+    page_count: Optional[int] = None
+    analyzed_with: Optional[str] = None
+    analyzed_at: Optional[str] = None
+
+class ExportFhirRequest(BaseModel):
+    entities: list[ExportFhirEntity]
+    doc_meta: Optional[ExportFhirDocMeta] = None
+
+@app.post("/export-fhir")
+def export_fhir(req: ExportFhirRequest):
+    from fhir_gate import FhirGateError, entities_to_fhir
+
+    if not req.entities:
+        raise HTTPException(status_code=400, detail="At least one entity is required")
+
+    try:
+        payload = [e.model_dump() for e in req.entities]
+        meta = req.doc_meta.model_dump(exclude_none=True) if req.doc_meta else {}
+        return entities_to_fhir(payload, meta)
+    except FhirGateError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8765)

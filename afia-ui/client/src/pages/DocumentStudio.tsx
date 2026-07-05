@@ -9,12 +9,15 @@ import {
   uploadPDF,
   analyzeDocument,
   askDocument,
+  exportFhir,
   BASE_URL,
   type UploadedDocument,
   type DocumentAnalysisResult,
   type DocumentEntity,
   type DocumentSource,
+  type FhirExportResult,
 } from "@/services/openmed-client";
+import { FhirExportModal } from "@/components/FhirExportModal";
 import {
   saveDocument,
   getDocument,
@@ -44,6 +47,7 @@ import {
   Download,
   BookOpen,
   RefreshCw,
+  FileJson,
   type LucideIcon,
 } from "lucide-react";
 
@@ -402,6 +406,10 @@ export default function DocumentStudio() {
     end: number;
   } | null>(null);
   const [status, setStatus] = useState<DocumentStatus>("new");
+  const [fhirModalOpen, setFhirModalOpen] = useState(false);
+  const [fhirExporting, setFhirExporting] = useState(false);
+  const [fhirError, setFhirError] = useState<string | null>(null);
+  const [fhirResult, setFhirResult] = useState<FhirExportResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const search = useSearch();
 
@@ -469,6 +477,9 @@ export default function DocumentStudio() {
     setAsking(false);
     setQaHistory([]);
     setPassageHighlight(null);
+    setFhirModalOpen(false);
+    setFhirResult(null);
+    setFhirError(null);
     setStatus("new");
   };
 
@@ -629,6 +640,38 @@ export default function DocumentStudio() {
     }
   };
 
+  const handleExportFhir = async () => {
+    if (!uploadedDoc || !analysisResult || analysisResult.entities.length === 0)
+      return;
+    setFhirModalOpen(true);
+    setFhirExporting(true);
+    setFhirError(null);
+    setFhirResult(null);
+    try {
+      const result = await exportFhir(analysisResult.entities, {
+        title: uploadedDoc.filename,
+        page_count: uploadedDoc.page_count,
+        analyzed_with: analysisResult.model_used ?? undefined,
+      });
+      setFhirResult(result);
+    } catch (e) {
+      setFhirError(e instanceof Error ? e.message : "FHIR export failed");
+    } finally {
+      setFhirExporting(false);
+    }
+  };
+
+  const handleDownloadFhir = () => {
+    if (!fhirResult || !uploadedDoc) return;
+    const json = JSON.stringify(fhirResult.bundle, null, 2);
+    downloadFile(
+      json,
+      `afia-fhir-${uploadedDoc.document_id}.json`,
+      "application/json",
+    );
+    logAction("export", "document", uploadedDoc.document_id);
+  };
+
   const entities = analysisResult?.entities ?? [];
   const entityCount = entities.length;
   const uniqueLabelCount = groupedEntities.length;
@@ -740,7 +783,7 @@ export default function DocumentStudio() {
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {analysisResult && (
+                {analysisResult && entityCount > 0 && (
                   <>
                     <Button
                       variant="outline"
@@ -757,6 +800,14 @@ export default function DocumentStudio() {
                     >
                       <Download className="size-4" />
                       Export JSON
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleExportFhir()}
+                    >
+                      <FileJson className="size-4" />
+                      Export FHIR
                     </Button>
                     <ShareMenu
                       text={buildDocumentShareText(
@@ -1003,6 +1054,15 @@ export default function DocumentStudio() {
           </div>
         )}
       </div>
+
+      <FhirExportModal
+        open={fhirModalOpen}
+        onOpenChange={setFhirModalOpen}
+        result={fhirResult}
+        loading={fhirExporting}
+        error={fhirError}
+        onDownload={handleDownloadFhir}
+      />
     </div>
   );
 }

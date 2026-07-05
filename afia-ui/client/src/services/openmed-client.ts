@@ -182,6 +182,49 @@ export function passagesToSources(
   }));
 }
 
+export interface FhirExportDocMeta {
+  title?: string;
+  page_count?: number;
+  analyzed_with?: string;
+  analyzed_at?: string;
+}
+
+export interface FhirExportSummary {
+  resources_created: Record<string, number>;
+  entities_skipped_pii: number;
+  entities_unmapped: number;
+  entities_skipped_empty?: number;
+}
+
+export interface FhirExportResult {
+  bundle: Record<string, unknown>;
+  summary: FhirExportSummary;
+}
+
+export async function exportFhir(
+  entities: DocumentEntity[],
+  docMeta: FhirExportDocMeta,
+): Promise<FhirExportResult> {
+  const res = await fetch(`${BASE_URL}/export-fhir`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ entities, doc_meta: docMeta }),
+  });
+  if (!res.ok) {
+    let message = "FHIR export failed";
+    try {
+      const body = (await res.json()) as { detail?: string };
+      if (typeof body.detail === "string" && body.detail.length > 0) {
+        message = body.detail;
+      }
+    } catch {
+      /* use default message */
+    }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 export async function askDocument(
   text: string,
   question: string,
