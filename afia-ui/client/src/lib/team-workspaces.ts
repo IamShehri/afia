@@ -162,12 +162,25 @@ export async function listPendingInvites(
   }));
 }
 
+export interface CreateWorkspaceInviteResult {
+  invite: {
+    id: string;
+    workspace_id: string;
+    email: string;
+    role: InviteRole;
+    expires_at: string;
+    token: string;
+  };
+  email_sent: boolean;
+  email_error?: string;
+}
+
 export async function createWorkspaceInvite(
   workspaceId: string,
   email: string,
   role: InviteRole,
-): Promise<void> {
-  await invokeWorkspaceInvites({
+): Promise<CreateWorkspaceInviteResult> {
+  return invokeWorkspaceInvites({
     action: "create",
     workspace_id: workspaceId,
     email: email.trim(),

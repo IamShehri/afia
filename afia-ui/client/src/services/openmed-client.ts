@@ -326,10 +326,10 @@ export async function getModels(options?: {
   return modelsCatalogPromise;
 }
 
-/** Lightweight bridge reachability check — HEAD only, no catalog body. */
+/** Lightweight bridge reachability check — GET /health, no catalog work. */
 export async function probeBridgeConnection(): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}/models`, { method: "HEAD" });
+    const res = await fetch(`${BASE_URL}/health`);
     return res.ok;
   } catch {
     return false;

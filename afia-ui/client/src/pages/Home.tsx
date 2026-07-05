@@ -17,7 +17,7 @@ import { useTeamWorkspace } from "@/contexts/TeamWorkspaceContext";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { ShareMenu } from "@/components/ShareMenu";
-import { APP_PUBLIC_URL } from "@/const";
+import { getAppPublicUrl } from "@/lib/app-url";
 import { HOME_SHARE_TEXT } from "@/lib/social-share";
 import {
   FileText,
@@ -145,7 +145,7 @@ export default function Home() {
                   })
             }
           />
-          <ShareMenu text={HOME_SHARE_TEXT} url={APP_PUBLIC_URL} />
+          <ShareMenu text={HOME_SHARE_TEXT} url={getAppPublicUrl()} />
         </div>
 
         {/* SECTION 1 — Quick Actions */}

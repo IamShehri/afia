@@ -1,4 +1,10 @@
--- Run once in the Supabase SQL editor before pilot onboarding.
+-- =============================================================================
+-- REFERENCE ONLY — never contains destructive statements.
+-- Destructive changes live in dated files under migrations/ with a -- DANGER header.
+--
+-- Safe to inspect or paste piecemeal. Re-running this file must NOT drop data.
+-- For greenfield setup, apply tables/policies once; for changes, use migrations/.
+-- =============================================================================
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -39,6 +45,7 @@ $$;
 -- Documents (per-user; encrypted fields via documents-crypto Edge Function)
 -- title, content, and metadata are stored as base64 AES-256-GCM ciphertext.
 -- Client must NOT read/write those columns directly — use the Edge Function.
+-- workspace_id: see supabase/migrations/workspaces.sql
 create table if not exists public.documents (
   id uuid primary key default gen_random_uuid(),
   bridge_document_id text not null,
@@ -93,4 +100,3 @@ alter table public.audit_log enable row level security;
 create policy "Users can insert own audit entries"
   on public.audit_log for insert
   with check (auth.uid() = user_id);
-

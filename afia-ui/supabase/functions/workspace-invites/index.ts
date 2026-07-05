@@ -63,47 +63,72 @@ async function sendInviteEmail(
   toEmail: string,
   workspaceName: string,
   token: string,
-): Promise<void> {
+): Promise<{ sent: true } | { sent: false; error: string }> {
   const resendKey = Deno.env.get("RESEND_API_KEY");
   const appPublicUrl = Deno.env.get("APP_PUBLIC_URL");
   const fromAddress = Deno.env.get("RESEND_FROM") ??
     "AFIA <onboarding@resend.dev>";
 
   if (!resendKey) {
-    throw new Error(
-      "RESEND_API_KEY secret is not configured — set it via: supabase secrets set RESEND_API_KEY=...",
-    );
+    return {
+      sent: false,
+      error:
+        "RESEND_API_KEY secret is not configured — set it via: supabase secrets set RESEND_API_KEY=...",
+    };
   }
   if (!appPublicUrl) {
-    throw new Error(
-      "APP_PUBLIC_URL secret is not configured — set it via: supabase secrets set APP_PUBLIC_URL=...",
-    );
+    return {
+      sent: false,
+      error:
+        "APP_PUBLIC_URL secret is not configured — set it via: supabase secrets set APP_PUBLIC_URL=...",
+    };
   }
 
   const acceptUrl = `${appPublicUrl.replace(/\/$/, "")}/invite/${token}`;
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${resendKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: fromAddress,
-      to: [toEmail],
-      subject: `You're invited to ${workspaceName} on AFIA`,
-      html: [
-        `<p>You have been invited to join the workspace <strong>${workspaceName}</strong> on AFIA.</p>`,
-        `<p><a href="${acceptUrl}">Accept invitation</a></p>`,
-        `<p>This link expires in 7 days. If you did not expect this email, you can ignore it.</p>`,
-      ].join(""),
-    }),
-  });
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: fromAddress,
+        to: [toEmail],
+        subject: `You're invited to ${workspaceName} on AFIA`,
+        html: [
+          `<p>You have been invited to join the workspace <strong>${workspaceName}</strong> on AFIA.</p>`,
+          `<p><a href="${acceptUrl}">Accept invitation</a></p>`,
+          `<p>This link expires in 7 days. If you did not expect this email, you can ignore it.</p>`,
+        ].join(""),
+      }),
+    });
 
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Failed to send invite email (${response.status}): ${detail}`);
+    if (!response.ok) {
+      const detail = await response.text();
+      return {
+        sent: false,
+        error: `Failed to send invite email (${response.status}): ${detail}`,
+      };
+    }
+
+    return { sent: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to send email";
+    return { sent: false, error: message };
   }
+}
+
+function inviteResponsePayload(row: InviteRow) {
+  return {
+    id: row.id,
+    workspace_id: row.workspace_id,
+    email: row.email,
+    role: row.role,
+    expires_at: row.expires_at,
+    token: row.token,
+  };
 }
 
 async function handleCreateWorkspace(
@@ -187,23 +212,24 @@ async function handleCreateInvite(
   }
 
   const row = invite as InviteRow;
+  const emailResult = await sendInviteEmail(
+    normalizedEmail,
+    workspace.name,
+    row.token,
+  );
 
-  try {
-    await sendInviteEmail(normalizedEmail, workspace.name, row.token);
-  } catch (err) {
-    await supabase.from("workspace_invites").delete().eq("id", row.id);
-    const message = err instanceof Error ? err.message : "Failed to send email";
-    return jsonResponse({ error: message }, 502);
+  if (!emailResult.sent) {
+    console.error("[workspace-invites] email not sent:", emailResult.error);
+    return jsonResponse({
+      invite: inviteResponsePayload(row),
+      email_sent: false,
+      email_error: emailResult.error,
+    });
   }
 
   return jsonResponse({
-    invite: {
-      id: row.id,
-      workspace_id: row.workspace_id,
-      email: row.email,
-      role: row.role,
-      expires_at: row.expires_at,
-    },
+    invite: inviteResponsePayload(row),
+    email_sent: true,
   });
 }
 

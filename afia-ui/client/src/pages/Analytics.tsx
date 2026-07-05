@@ -16,7 +16,7 @@ import { logAction } from "@/lib/audit";
 import { loadLibrarySummaries } from "@/lib/analytics-loader";
 import { useTeamWorkspace } from "@/contexts/TeamWorkspaceContext";
 import { ShareMenu } from "@/components/ShareMenu";
-import { APP_PUBLIC_URL } from "@/const";
+import { getAppPublicUrl } from "@/lib/app-url";
 import { buildAnalyticsShareText } from "@/lib/social-share";
 import {
   computeConfidenceByDocument,
@@ -178,7 +178,7 @@ export default function Analytics() {
             {!showEmpty && analyzedDocs.length >= 2 && (
               <ShareMenu
                 text={analyticsShareText}
-                url={APP_PUBLIC_URL}
+                url={getAppPublicUrl()}
                 emailSubject="AFIA Analytics summary"
               />
             )}

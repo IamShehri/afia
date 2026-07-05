@@ -26,7 +26,7 @@ import {
   type AnalyzedDocSummary,
 } from "@/lib/analytics-library";
 import { ShareMenu } from "@/components/ShareMenu";
-import { APP_PUBLIC_URL } from "@/const";
+import { getAppPublicUrl } from "@/lib/app-url";
 import { buildAnalyticsShareText } from "@/lib/social-share";
 import {
   buildEntityNodeMeta,
@@ -343,7 +343,7 @@ export function EntityGraphPanel({ analyzedDocs }: EntityGraphPanelProps) {
           </Button>
           <ShareMenu
             text={shareText}
-            url={APP_PUBLIC_URL}
+            url={getAppPublicUrl()}
             emailSubject="AFIA Entity Graph summary"
           />
         </div>

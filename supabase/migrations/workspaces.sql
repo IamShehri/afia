@@ -4,12 +4,14 @@
 --
 -- Authorization model: encryption stays server-side with one app key; sharing is
 -- membership on workspace_id, not key exchange. NULL workspace_id = personal doc.
+--
+-- Audit: no DROP TABLE statements. Policy drops below are RLS-only (no row data loss).
 
 -- =============================================================================
 -- 1. workspaces
 -- =============================================================================
 
-create table public.workspaces (
+create table if not exists public.workspaces (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   owner_id uuid not null references auth.users (id) on delete cascade,
@@ -25,7 +27,7 @@ comment on table public.workspaces is
 -- 2. workspace_members
 -- =============================================================================
 
-create table public.workspace_members (
+create table if not exists public.workspace_members (
   workspace_id uuid not null references public.workspaces (id) on delete cascade,
   user_id uuid not null references auth.users (id) on delete cascade,
   role text not null check (role in ('owner', 'editor', 'viewer')),
@@ -42,7 +44,7 @@ comment on table public.workspace_members is
 -- 3. workspace_invites
 -- =============================================================================
 
-create table public.workspace_invites (
+create table if not exists public.workspace_invites (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces (id) on delete cascade,
   email text not null,
@@ -263,6 +265,7 @@ create policy "Workspace owner can revoke invites"
 
 -- =============================================================================
 -- 6. RLS — documents (replace four own-user policies)
+-- DANGER: drops legacy documents RLS policies only — no table or row data affected.
 -- =============================================================================
 
 drop policy if exists "Users can view own documents" on public.documents;

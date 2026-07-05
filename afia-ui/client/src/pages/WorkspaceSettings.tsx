@@ -25,7 +25,8 @@ import {
   type WorkspaceInviteRow,
   type WorkspaceMemberRow,
 } from "@/lib/team-workspaces";
-import { Loader2, LogOut, Mail, UserPlus, Users } from "lucide-react";
+import { workspaceInviteUrl } from "@/lib/app-url";
+import { Loader2, LogOut, Mail, UserPlus, Users, Copy } from "lucide-react";
 
 export default function WorkspaceSettings() {
   const params = useParams<{ id: string }>();
@@ -45,6 +46,7 @@ export default function WorkspaceSettings() {
   const [inviteRole, setInviteRole] = useState<InviteRole>("editor");
   const [inviting, setInviting] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [unsentInviteLink, setUnsentInviteLink] = useState<string | null>(null);
 
   useEffect(() => {
     if (!workspaceId || !workspace) {
@@ -81,14 +83,33 @@ export default function WorkspaceSettings() {
     if (!email || !isOwner) return;
     setInviting(true);
     try {
-      await createWorkspaceInvite(workspaceId, email, inviteRole);
+      const result = await createWorkspaceInvite(workspaceId, email, inviteRole);
       setInviteEmail("");
       setInvites(await listPendingInvites(workspaceId));
-      toast.success(`Invite sent to ${email}`);
+      if (result.email_sent) {
+        setUnsentInviteLink(null);
+        toast.success(`Invite sent to ${email}`);
+      } else {
+        const link = workspaceInviteUrl(result.invite.token);
+        setUnsentInviteLink(link);
+        toast.message(
+          "Invite created — email couldn't be sent, copy the link instead",
+        );
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Invite failed");
     } finally {
       setInviting(false);
+    }
+  };
+
+  const handleCopyInviteLink = async () => {
+    if (!unsentInviteLink) return;
+    try {
+      await navigator.clipboard.writeText(unsentInviteLink);
+      toast.success("Invite link copied");
+    } catch {
+      toast.error("Could not copy link");
     }
   };
 
@@ -230,6 +251,28 @@ export default function WorkspaceSettings() {
                         </Button>
                       </div>
                     </div>
+
+                    {unsentInviteLink && (
+                      <div className="rounded-md border border-warning/30 bg-warning/5 p-3 text-sm">
+                        <p className="font-medium text-foreground">
+                          Invite created — email couldn&apos;t be sent, copy the
+                          link instead
+                        </p>
+                        <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                          {unsentInviteLink}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-3"
+                          onClick={() => void handleCopyInviteLink()}
+                        >
+                          <Copy className="size-4" />
+                          Copy invite link
+                        </Button>
+                      </div>
+                    )}
 
                     {invites.length > 0 && (
                       <div className="space-y-2">

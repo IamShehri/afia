@@ -9,7 +9,7 @@ import { WorkspaceSwitcher } from "@/components/shell/WorkspaceSwitcher";
 import { AccountMenu } from "@/components/shell/AccountMenu";
 import { ShareMenu } from "@/components/ShareMenu";
 import { AfiaWordmark } from "@/components/brand/AfiaMark";
-import { APP_PUBLIC_URL } from "@/const";
+import { getAppPublicUrl } from "@/lib/app-url";
 import { HOME_SHARE_TEXT } from "@/lib/social-share";
 import {
   studioNav,
@@ -144,7 +144,7 @@ export function TopBar() {
       <div className="ml-auto flex shrink-0 items-center gap-1">
         <ShareMenu
           text={HOME_SHARE_TEXT}
-          url={APP_PUBLIC_URL}
+          url={getAppPublicUrl()}
           variant="icon"
         />
         <Button

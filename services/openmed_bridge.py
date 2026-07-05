@@ -342,7 +342,7 @@ def _retrieve_passages(text: str, question: str, top_k: int) -> list[dict]:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": openmed.__version__}
+    return {"ok": True}
 
 @app.get("/models")
 async def list_models():

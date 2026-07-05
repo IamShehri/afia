@@ -36,7 +36,7 @@ import { resolveAnalysisModel } from "@/services/model-preference";
 import { ShareMenu } from "@/components/ShareMenu";
 import { AnalysisModelPicker } from "@/components/document-studio/AnalysisModelPicker";
 import { ExternalSearchMenu } from "@/components/ExternalSearchMenu";
-import { APP_PUBLIC_URL } from "@/const";
+import { getAppPublicUrl } from "@/lib/app-url";
 import { buildDocumentShareText } from "@/lib/social-share";
 import {
   UPLOAD_ACCEPT,
@@ -894,7 +894,7 @@ export default function DocumentStudio() {
                         entityCount,
                         uploadedDoc.page_count,
                       )}
-                      url={APP_PUBLIC_URL}
+                      url={getAppPublicUrl()}
                     />
                     {storedRowId && (
                       <MoveToWorkspaceMenu
