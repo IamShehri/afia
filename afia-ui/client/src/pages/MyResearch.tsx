@@ -215,14 +215,11 @@ export default function MyResearch() {
                       >
                         {STATUS_LABELS[status]}
                       </span>
-                    </div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">
-                      {doc.entities.length} entities · {doc.page_count} pages
+                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                        {relativeTime(doc.lastAccessedAt)}
+                      </span>
                     </div>
                   </div>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {relativeTime(doc.lastAccessedAt)}
-                  </span>
                 </button>
               );
             })}

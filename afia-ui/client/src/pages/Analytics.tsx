@@ -10,6 +10,8 @@ import { DocumentComparisonPanel } from "@/components/analytics/DocumentComparis
 import { EntityGraphPanel } from "@/components/analytics/EntityGraphPanel";
 import { CooccurrenceMatrixPanel } from "@/components/analytics/CooccurrenceMatrix";
 import { EntityStatisticsTable } from "@/components/analytics/EntityStatisticsTable";
+import { ResearchDataExportButton } from "@/components/analytics/ResearchDataExportButton";
+import { ResearchReportButton } from "@/components/analytics/ResearchReportButton";
 import { logAction } from "@/lib/audit";
 import { loadLibrarySummaries } from "@/lib/analytics-loader";
 import { ShareMenu } from "@/components/ShareMenu";
@@ -344,6 +346,24 @@ export default function Analytics() {
               </TabsContent>
 
               <TabsContent value="workbench" className="space-y-6">
+                <Card>
+                  <CardContent>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <SectionLabel>Research export</SectionLabel>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Download tidy CSVs or generate a printable summary
+                          report for your research notes
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ResearchDataExportButton docs={analyzedDocs} />
+                        <ResearchReportButton />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardContent>
                     <SectionLabel>Co-occurrence matrix</SectionLabel>

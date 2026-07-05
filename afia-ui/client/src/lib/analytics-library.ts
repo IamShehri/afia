@@ -6,6 +6,10 @@ export interface AnalyzedDocSummary {
   filename: string;
   entities: DocumentEntity[];
   lastAccessedAt: number;
+  pageCount: number;
+  wordCount: number;
+  modelUsed?: string;
+  analyzedAt: number;
 }
 
 export const LIBRARY_ANALYTICS_CAP = 50;
@@ -383,4 +387,51 @@ export function getCooccurrencePairDocs(
   const b = matrix.entities[col]?.id;
   if (!a || !b) return [];
   return matrix.pairDocIds[pairKey(a, b)] ?? [];
+}
+
+export interface CooccurrenceLongRow {
+  entity_a: string;
+  entity_b: string;
+  count: number;
+}
+
+/** All entity pair co-occurrences across the library (long/tidy format). */
+export function computeCooccurrenceLong(
+  docs: AnalyzedDocSummary[],
+): CooccurrenceLongRow[] {
+  if (docs.length === 0) return [];
+
+  const aggregates = buildEntityAggregates(docs);
+  const idToLabel = new Map<string, string>();
+  for (const agg of aggregates.values()) {
+    idToLabel.set(agg.id, agg.label);
+  }
+
+  const pairCounts = new Map<string, number>();
+  for (const doc of docs) {
+    const keys = [
+      ...new Set(
+        doc.entities
+          .map((entity) => normalizeText(entity.text.trim()))
+          .filter(Boolean),
+      ),
+    ];
+    for (let i = 0; i < keys.length; i += 1) {
+      for (let j = i + 1; j < keys.length; j += 1) {
+        const key = pairKey(keys[i]!, keys[j]!);
+        pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
+      }
+    }
+  }
+
+  return [...pairCounts.entries()]
+    .map(([key, count]) => {
+      const [a, b] = key.split("|") as [string, string];
+      return {
+        entity_a: idToLabel.get(a) ?? a,
+        entity_b: idToLabel.get(b) ?? b,
+        count,
+      };
+    })
+    .sort((left, right) => right.count - left.count);
 }

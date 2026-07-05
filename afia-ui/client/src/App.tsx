@@ -23,6 +23,7 @@ import Deidentify from "./pages/Deidentify";
 import Models from "./pages/Models";
 import Insights from "./pages/Insights";
 import Analytics from "./pages/Analytics";
+import AnalyticsReport from "./pages/AnalyticsReport";
 import { Loader2 } from "lucide-react";
 import Settings from "./pages/Settings";
 import { useEffect } from "react";
@@ -61,6 +62,7 @@ function Router() {
       <Route path="/inbox">{() => <PrivateRoute><Shell><Inbox /></Shell></PrivateRoute>}</Route>
       <Route path="/assistant">{() => <PrivateRoute><Shell><Assistant /></Shell></PrivateRoute>}</Route>
       <Route path="/documents">{() => <PrivateRoute><Shell><DocumentStudio /></Shell></PrivateRoute>}</Route>
+      <Route path="/analytics/report">{() => <PrivateRoute><AnalyticsReport /></PrivateRoute>}</Route>
       <Route path="/analytics">{() => <PrivateRoute><Shell><Analytics /></Shell></PrivateRoute>}</Route>
       <Route path="/research">{() => <PrivateRoute><Shell><MyResearch /></Shell></PrivateRoute>}</Route>
       <Route path="/batch">{() => <PrivateRoute><Shell><BatchProcess /></Shell></PrivateRoute>}</Route>

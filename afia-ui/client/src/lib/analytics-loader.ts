@@ -6,6 +6,12 @@ import {
 
 const FETCH_CONCURRENCY = 4;
 
+function countWords(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  return trimmed.split(/\s+/).length;
+}
+
 export interface LibraryLoadResult {
   analyzed: AnalyzedDocSummary[];
   skippedUnanalyzed: number;
@@ -49,6 +55,10 @@ export async function loadLibrarySummaries(
             filename: full.filename,
             entities: full.entities,
             lastAccessedAt: full.lastAccessedAt,
+            pageCount: full.page_count,
+            wordCount: countWords(full.full_text),
+            modelUsed: full.modelUsed,
+            analyzedAt: full.uploadedAt ?? full.lastAccessedAt,
           });
         } catch {
           skippedUnanalyzed += 1;

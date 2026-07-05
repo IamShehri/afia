@@ -11,8 +11,9 @@ import {
 import { inboxItems } from "@/data/workspace";
 import { patients } from "@/data/patients";
 import type { Patient } from "@/data/types";
-import { filterUserDocuments, listDocuments, type StoredDocument } from "@/lib/documents";
+import { filterUserDocuments, listDocuments, type DocumentStatus, type StoredDocument } from "@/lib/documents";
 import { useLocation } from "wouter";
+import { cn } from "@/lib/utils";
 import { ShareMenu } from "@/components/ShareMenu";
 import { APP_PUBLIC_URL } from "@/const";
 import { HOME_SHARE_TEXT } from "@/lib/social-share";
@@ -53,6 +54,20 @@ const quickActions: QuickAction[] = [
     icon: Boxes,
   },
 ];
+
+type UserDocumentStatus = Exclude<DocumentStatus, "artifact">;
+
+const STATUS_LABELS: Record<UserDocumentStatus, string> = {
+  new: "New",
+  in_progress: "In Progress",
+  reviewed: "Reviewed",
+};
+
+const STATUS_STYLES: Record<UserDocumentStatus, string> = {
+  new: "border-info/25 bg-info/10 text-info",
+  in_progress: "border-warning/25 bg-warning/10 text-warning",
+  reviewed: "border-success/25 bg-success/10 text-success",
+};
 
 /* Compact relative-time formatter — no external dependency. */
 function relativeTime(ts: number): string {
@@ -178,7 +193,9 @@ export default function Home() {
               </div>
             ) : (
               <div className="flex gap-3 overflow-x-auto">
-                {recentDocs.map((doc) => (
+                {recentDocs.map((doc) => {
+                  const status = (doc.status ?? "new") as UserDocumentStatus;
+                  return (
                   <button
                     key={doc.id}
                     type="button"
@@ -189,14 +206,22 @@ export default function Home() {
                     <div className="mt-2 truncate text-sm font-medium">
                       {doc.filename}
                     </div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">
-                      {doc.page_count} pages · {doc.entities.length} entities
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {relativeTime(doc.lastAccessedAt)}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
+                          STATUS_STYLES[status],
+                        )}
+                      >
+                        {STATUS_LABELS[status]}
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {relativeTime(doc.lastAccessedAt)}
+                      </span>
                     </div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
